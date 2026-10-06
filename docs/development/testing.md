@@ -23,6 +23,15 @@ copy-on-write overlay) and checks:
    failed units carried in the marker; any failed unit fails the test.
 3. **session** — `MADOS_SESSION_OK`: logind reports an active Wayland/X11 user
    session (dev images autologin). `make smoke` requires it.
+   - **apps** — `MADOS_APPS`: the dev-only user unit
+     `mados-session-check.service` runs `madosctl session-check` in the
+     session; it launches Konsole, Dolphin, Firefox and MadOS Settings and
+     records `ok` when each claims its D-Bus name (it reached its main loop),
+     `running` when it stayed alive without one (reported as weaker),
+     `exited`/`missing`/`failed` otherwise. `make smoke` requires the report.
+   - **audio** — same marker: `audio=ok` means the kernel found a sound card
+     (`/proc/asound/cards`) and WirePlumber has a default sink
+     (`wpctl inspect @DEFAULT_AUDIO_SINK@`).
 4. **network** — via qemu-guest-agent: a non-loopback interface has IPv4.
 5. **screenshot** — QMP `screendump` to `out/smoke/screen.png` (for humans).
 6. **reboot** — guest-agent `guest-shutdown mode=reboot`; requires
@@ -40,16 +49,14 @@ harness):
 MADOS_BOOT_OK version=0.1.0-dev build=<id> kernel=<release> state=running failed=none
 MADOS_SESSION_OK type=wayland class=user desktop=KDE
 MADOS_SESSION_NONE reason=timeout
+MADOS_APPS terminal=ok files=ok browser=ok settings=ok audio=ok
+MADOS_APPS_NONE reason=timeout
 MADOS_SHUTDOWN
 ```
 
 ## Not yet automated
 
-- Audio playback inside the guest (the VM has an Intel HDA device; checking
-  PipeWire sees it needs guest command execution, which Fedora's guest-agent
-  configuration blocks — intentionally).
-- Launching applications inside the session (planned: a dev-only user
-  service that launches Konsole, Dolphin, Firefox and mados-settings and
-  reports their window creation over the serial marker channel).
+- Audible playback (the check proves device + sink, not sound output).
+- Window mapping on screen (the app check proves D-Bus registration).
 - Installer ISO end-to-end installation.
 - Full image bit-for-bit reproducibility.

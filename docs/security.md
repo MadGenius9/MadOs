@@ -48,6 +48,7 @@ and are verified absent from `release` builds by `tests/config/validate.py`:
 |---|---|---|
 | SDDM **autologin** of user `mados` | VM smoke test must reach a graphical session without typing a password | `system/templates/sddm-dev-autologin.conf` |
 | Serial console kernel arguments | boot markers for automated tests | `system/variants/dev/usr/lib/bootc/kargs.d/` |
+| `mados-session-check` user unit | launches the default apps once per login and checks audio for the smoke test; runs as the user, starts only fixed program paths | `system/variants/dev/usr/lib/systemd/user/` |
 | Development user `mados` in `wheel` with a per-build password | log in to VMs | created by `scripts/build-disk.sh` at disk-build time; password is random unless `MADOS_DEV_PASSWORD` is set, stored only in git-ignored `out/dev-credentials.txt` |
 | `qemu-guest-agent` installed | clean reboot/shutdown and network checks from tests | installed in all images; activates only when a virtio guest-agent port exists; Fedora's default config blocks `guest-exec` and file RPCs |
 

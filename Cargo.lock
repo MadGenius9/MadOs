@@ -766,6 +766,7 @@ version = "0.1.0"
 dependencies = [
  "mados-api",
  "mados-core",
+ "serde",
  "serde_json",
  "zbus",
 ]

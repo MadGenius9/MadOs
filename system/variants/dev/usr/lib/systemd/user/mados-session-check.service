@@ -1,0 +1,17 @@
+# DEVELOPMENT IMAGES ONLY: launches the default applications once per login
+# and checks audio, for the VM smoke test (madosctl boot-report relays the
+# result to the serial console). Enabled by scripts/stage-system.py.
+[Unit]
+Description=Development session check (mados-session-check)
+After=graphical-session.target
+PartOf=graphical-session.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/madosctl session-check --timeout 90
+SyslogIdentifier=mados-session-check
+NoNewPrivileges=yes
+TimeoutStartSec=600
+
+[Install]
+WantedBy=graphical-session.target

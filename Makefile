@@ -77,7 +77,7 @@ vm-iso:
 	$(PYTHON) scripts/vm.py run --iso "$$(ls -t out/*.iso 2>/dev/null | head -n1)"
 
 smoke:
-	$(PYTHON) tests/smoke/vm_smoke.py --require-session
+	$(PYTHON) tests/smoke/vm_smoke.py --require-session --require-apps
 
 clean:
 	$(CARGO) clean

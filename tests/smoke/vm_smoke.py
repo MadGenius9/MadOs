@@ -7,6 +7,9 @@ Boots an image in QEMU (UEFI) and checks, in order:
                 mados-boot-report.service after graphical.target)
   2. units      no failed systemd units (from the marker's failed= field)
   3. session    MADOS_SESSION_OK: an active Wayland/X11 user session
+     apps       MADOS_APPS (dev images): terminal, file manager, browser and
+                settings each started and claimed their D-Bus name
+     audio      MADOS_APPS audio=ok: sound card + PipeWire default sink
   4. network    a non-loopback interface with an IPv4 address (guest agent)
   5. screenshot QMP screendump of the display (artifact for humans)
   6. reboot     clean reboot via the guest agent; a second MADOS_BOOT_OK
@@ -34,6 +37,8 @@ import vm  # noqa: E402
 
 BOOT_RE = re.compile(r"MADOS_BOOT_OK (.*)")
 SESSION_RE = re.compile(r"MADOS_SESSION_(OK|NONE) ?(.*)")
+APPS_RE = re.compile(r"MADOS_APPS(_NONE)? (.*)")
+APP_KEYS = ("terminal", "files", "browser", "settings")
 
 
 def fields(s: str) -> dict[str, str]:
@@ -147,6 +152,25 @@ def run(ns: argparse.Namespace) -> int:
         else:
             detail = m.group(2) if m else "no session marker"
             report.add("session", "fail" if ns.require_session else "skip", detail)
+        session_ok = bool(m and m.group(1) == "OK")
+
+        # apps + audio (relayed from the dev-only session check)
+        m = serial.wait_for(APPS_RE, ns.apps_timeout, proc, boot_end) if session_ok else None
+        if m and not m.group(1):
+            res = fields(m.group(2))
+            # "running" = alive at the deadline but no D-Bus name: weaker, reported as such.
+            bad = [k for k in APP_KEYS if res.get(k) not in ("ok", "running")]
+            weak = [k for k in APP_KEYS if res.get(k) == "running"]
+            detail = " ".join(f"{k}={res.get(k, 'absent')}" for k in APP_KEYS)
+            if weak:
+                detail += f" (no D-Bus name: {','.join(weak)})"
+            report.add("apps", "fail" if bad else "pass", detail)
+            audio = res.get("audio", "unknown")
+            report.add("audio", {"ok": "pass", "unknown": "skip"}.get(audio, "fail"), f"audio={audio}")
+        else:
+            why = "no graphical session" if not session_ok else (m.group(2) if m else "no MADOS_APPS marker")
+            report.add("apps", "fail" if ns.require_apps else "skip", why)
+            report.add("audio", "skip", why)
 
         # 4. network via guest agent
         ga = guest_agent(cfg, ns.agent_timeout)
@@ -244,6 +268,8 @@ def main(argv: list[str]) -> int:
     ap.add_argument("--agent-timeout", type=int, default=120)
     ap.add_argument("--shutdown-timeout", type=int, default=300)
     ap.add_argument("--require-session", action="store_true", help="fail if no graphical session")
+    ap.add_argument("--require-apps", action="store_true", help="fail if the dev session check does not report")
+    ap.add_argument("--apps-timeout", type=int, default=600)
     ap.add_argument("--no-reboot", dest="reboot", action="store_false")
     ns = ap.parse_args(argv)
     if not ns.disk and not ns.kernel:

@@ -21,7 +21,7 @@ this environment allows; awaiting end-to-end verification), **planned**.
 
 1. Run CI's `image` job; fix whatever the first real build/boot reveals.
 2. Pin the base image digest once a known-good build exists.
-3. App-launch smoke checks (Konsole, Dolphin, Firefox, Settings) and an
-   audio-device check in the VM.
+3. ~~App-launch smoke checks and audio-device check~~ (implemented; first
+   result comes with the first successful VM boot in CI).
 4. Settings: Network & Wi-Fi page via NetworkManager D-Bus.
 5. Prove `make iso` end-to-end in CI.

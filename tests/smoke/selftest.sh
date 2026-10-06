@@ -52,7 +52,8 @@ mount -t sysfs sys /sys
 mount -t devtmpfs dev /dev 2>/dev/null
 out=/dev/ttyS0
 echo "MADOS_BOOT_OK version=selftest build=selftest kernel=$(uname -r) state=running failed=none" > $out
-echo "MADOS_SESSION_NONE reason=selftest-guest" > $out
+echo "MADOS_SESSION_OK type=selftest class=user desktop=selftest" > $out
+echo "MADOS_APPS terminal=ok files=ok browser=running settings=ok audio=unknown" > $out
 sleep 25
 echo "MADOS_SHUTDOWN" > $out
 poweroff -f
@@ -65,5 +66,5 @@ exec python3 "$ROOT/tests/smoke/vm_smoke.py" \
     --kernel "$kernel" --initrd "$WORK/initramfs.img" \
     --append "console=ttyS0 panic=-1 quiet" \
     --workdir "$WORK/run" --memory 512 --cpus 1 \
-    --timeout 600 --session-timeout 30 --agent-timeout 3 --no-reboot \
+    --timeout 600 --session-timeout 30 --apps-timeout 30 --agent-timeout 3 --no-reboot \
     --shutdown-timeout 120

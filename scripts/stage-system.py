@@ -273,6 +273,13 @@ esac
         tmpl = (ROOT / "system/templates/sddm-dev-autologin.conf").read_text()
         write(dest, "etc/sddm.conf.d/50-mados-dev-autologin.conf", tmpl.replace("@DEV_USER@", args.dev_user))
         notes.append(f"dev variant: SDDM autologin for user {args.dev_user!r}")
+        # Enable the dev session check for every user (global user unit).
+        wants = dest / "usr/lib/systemd/user/graphical-session.target.wants"
+        wants.mkdir(parents=True, exist_ok=True)
+        link = wants / "mados-session-check.service"
+        if not link.is_symlink():
+            link.symlink_to("../mados-session-check.service")
+        notes.append("dev variant: mados-session-check.service enabled")
     return notes
 
 

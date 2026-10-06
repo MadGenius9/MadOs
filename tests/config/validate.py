@@ -228,6 +228,12 @@ def validate_staging(tree: Path) -> None:
     variant = info.get("variant")
     autologin = tree / "etc/sddm.conf.d/50-mados-dev-autologin.conf"
     check(autologin.exists() == (variant == "dev"), "SDDM autologin must exist only in dev variant")
+    session_check = tree / "usr/lib/systemd/user/mados-session-check.service"
+    check(session_check.exists() == (variant == "dev"), "session check unit must exist only in dev variant")
+    link = tree / "usr/lib/systemd/user/graphical-session.target.wants/mados-session-check.service"
+    check(link.is_symlink() == (variant == "dev"), "session check must be enabled only in dev variant")
+    if link.is_symlink():
+        check(link.resolve() == session_check.resolve(), "session check enable link must point at the unit")
     creds = [
         str(p.relative_to(tree))
         for p in tree.rglob("*")

@@ -4,8 +4,10 @@
 //!   madosctl about [--json]     system information (local, unprivileged)
 //!   madosctl update-status      deployment status via org.mados.System1
 //!   madosctl boot-report        boot/session marker for VM smoke tests
+//!   madosctl session-check      dev images: launch default apps, check audio
 
 mod boot_report;
+mod session_check;
 
 use mados_core::sysinfo::{self, format_bytes, SessionEnv};
 use mados_core::Product;
@@ -28,9 +30,10 @@ fn main() {
         }
         ["update-status"] => update_status(),
         ["boot-report", rest @ ..] => boot_report::run(rest),
+        ["session-check", rest @ ..] => session_check::run(rest),
         _ => {
             eprintln!(
-                "usage: madosctl version | about [--json] | update-status | boot-report [--session-timeout SECS]"
+                "usage: madosctl version | about [--json] | update-status | boot-report [--session-timeout SECS] | session-check [--timeout SECS]"
             );
             2
         }

@@ -10,5 +10,6 @@ publish.workspace = true
 [dependencies]
 mados-core.workspace = true
 mados-api.workspace = true
+serde.workspace = true
 serde_json.workspace = true
 zbus.workspace = true
