@@ -55,9 +55,19 @@ MADOS_APPS_NONE reason=timeout
 MADOS_SHUTDOWN
 ```
 
+## Installer ISO test (`make iso-test`)
+
+`tests/smoke/iso_install.py` extracts the installer kernel/initrd from the
+newest `out/*.iso` (the ISO is not modified) and boots it with a tiny extra
+disk image labelled `OEMDRV` holding an unattended kickstart (Anaconda loads
+`ks.cfg` from such a volume automatically). The kickstart installs the
+MadOS image embedded in the ISO onto a scratch disk in `out/iso-install/`
+and powers off; the installed disk is then booted through the regular smoke
+test. Runs in CI on manual runs with `build_iso`. The shipped ISO contains
+no unattended path: without an OEMDRV volume, Anaconda is interactive.
+
 ## Not yet automated
 
 - Audible playback (the check proves device + sink, not sound output).
 - Window mapping on screen (the app check proves D-Bus registration).
-- Installer ISO end-to-end installation.
 - Full image bit-for-bit reproducibility.

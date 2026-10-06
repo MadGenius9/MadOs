@@ -10,6 +10,7 @@
 #   make vm            boot the newest disk image in QEMU
 #   make vm-iso        boot the newest installer ISO in QEMU (scratch disk)
 #   make smoke         automated boot/session/network/reboot/shutdown test
+#   make iso-test      unattended install from the ISO, then smoke-test it
 #   make clean         remove build outputs
 
 SHELL := /bin/sh
@@ -19,7 +20,7 @@ VERSION := $(shell $(PYTHON) scripts/product.py version)
 STAGING := out/staging
 
 .PHONY: all setup build build-release stage test test-unit test-lint test-config \
-        test-harness image disk iso vm vm-iso smoke clean version help
+        test-harness image disk iso vm vm-iso smoke iso-test clean version help
 
 all: build
 
@@ -78,6 +79,9 @@ vm-iso:
 
 smoke:
 	$(PYTHON) tests/smoke/vm_smoke.py --require-session --require-apps
+
+iso-test:
+	$(PYTHON) tests/smoke/iso_install.py
 
 clean:
 	$(CARGO) clean

@@ -140,6 +140,22 @@ jobs:
         if: github.event_name == 'workflow_dispatch' && inputs.build_iso
         run: make iso
 
+      - name: Install from the ISO and boot the result (experimental)
+        if: github.event_name == 'workflow_dispatch' && inputs.build_iso
+        run: |
+          sudo apt-get install -y -q --no-install-recommends xorriso dosfstools mtools
+          rm -f out/*.qcow2
+          make iso-test
+
+      - name: ISO install highlights
+        if: always() && github.event_name == 'workflow_dispatch' && inputs.build_iso
+        run: |
+          for f in out/iso-install/serial.log out/iso-install/boot/serial.log; do
+            [ -f "$f" ] || continue
+            echo "--- $f"
+            grep -a -E "MADOS_|anaconda|Installing|Traceback|error|Error|Welcome to" "$f" | cut -c1-200 | tail -60 || true
+          done
+
       - name: Collect results
         if: always()
         run: |
