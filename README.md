@@ -16,7 +16,8 @@ KDE Plasma (Fedora Kinoite) as a temporary bootstrap, and this README says so.
 |---|---|
 | Bootable container image (bootc, Fedora 44 Kinoite base) | **builds in CI** (GitHub Actions job `image`): components compile against Fedora 44, `bootc container lint` passes. Cannot be built in the bootstrap dev environment (Fedora servers blocked) |
 | qcow2 disk image via image-builder | **builds in CI** |
-| **SELinux enforcing, MadOS identity at boot** | **verified in CI run #4**: `selinux=enforcing`, no failed units, systemd banner "Welcome to MadOS 0.1.0-dev!" (os-release branding), Wayland KDE session. The run failed later only because the boot report's sandbox (`ProtectHome=yes`) hid the dev session check's report in `/run/user`; fixed, re-running |
+| **Apps, audio, MadOS services in the booted VM** | **verified in CI run #5**: Konsole, Dolphin, Firefox and MadOS Settings each started and claimed their D-Bus names; sound card + PipeWire default sink present; `org.mados.System1` (real `bootc status`) and `org.mados.Assistant1` answered on the real buses; SELinux **enforcing**; network, clean reboot and shutdown. Run #5 was marked failed only because `mcelog.service` (Intel-only) failed on an AMD CI host; it is now skipped on non-Intel CPUs |
+| **MadOS identity at boot** | **verified (runs #4, #5)**: systemd banner "Welcome to MadOS 0.1.0-dev!", KDE's first-boot screen shows "Powered by MadOS" (os-release branding) |
 | **Boots in QEMU/KVM (UEFI)** | **verified in CI run #2**: `MADOS_BOOT_OK` 57 s after power-on (version 0.1.0-dev, Fedora kernel 7.2.8-200.fc44), `graphical.target` reached with **no failed units**, active **Wayland KDE session**, network up (DHCP 10.0.2.15), clean **reboot** to a second successful boot, clean **shutdown** (QEMU exit 0) |
 | Installer ISO (`bootc-generic-iso`) | written, with an unattended install test (`make iso-test`); **experimental**, not yet built |
 | MadOS components (Rust) | 57 unit/integration tests: D-Bus policy tests on a private bus; mock NetworkManager/BlueZ/AccountsService/logind; fake and simulated bootc; real PulseAudio server |
@@ -26,10 +27,13 @@ KDE Plasma (Fedora Kinoite) as a temporary bootstrap, and this README says so.
 
 ### What works (verified)
 
-- **The MadOS image builds and boots** (GitHub Actions run #2, QEMU/KVM,
-  UEFI): graphical target with no failed units, Wayland KDE session, network,
-  clean reboot and shutdown — detected by MadOS's own boot markers, not
-  screenshots.
+- **The MadOS image builds and boots** (GitHub Actions runs #2 and #5,
+  QEMU/KVM, UEFI): graphical target, SELinux enforcing, Wayland KDE session,
+  network, clean reboot and shutdown — detected by MadOS's own boot markers,
+  not screenshots. Run #5 also verified that the terminal, file manager,
+  browser and MadOS Settings start, that audio hardware and a PipeWire sink
+  are present, and that MadOS's system service and assistant work on the
+  real system.
 - `make build`, `make test`: fmt/clippy clean, 57 Rust tests, 156 static
   configuration checks, reproducibility check of generated files, QEMU
   harness self-test.
@@ -55,9 +59,9 @@ KDE Plasma (Fedora Kinoite) as a temporary bootstrap, and this README says so.
 
 ### Implemented but unverified
 
-On the booted image: launching Konsole/Dolphin/Firefox/Settings, audio
-device detection and the MadOS services check (run #4 could not read their
-report; fixed),
+On the booted image: the Plasma desktop itself after first boot (dev images
+now skip KDE's first-boot wizard because their user is pre-created; the next
+run's screenshot will show the desktop), mcelog being skipped on AMD,
 MadOS branding in Plasma (screenshot captured, not yet reviewed), and all
 MadOS services against the *real* polkit, logind, NetworkManager, BlueZ,
 AccountsService, PipeWire and bootc. The installer ISO.

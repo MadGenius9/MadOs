@@ -16,6 +16,14 @@ Hardware enablement (kernel, firmware, Mesa, Wi-Fi, Bluetooth, audio) comes
 unchanged from Fedora 44, so hardware Fedora Kinoite supports is the expected
 baseline once physical testing starts.
 
+## Platform adjustments
+
+- `mcelog.service` (Fedora) supports Intel CPUs only and fails on AMD
+  family 17h+, leaving the system "degraded". MadOS adds a drop-in
+  (`ExecCondition=/usr/libexec/mados/is-intel-cpu`) so it is skipped on
+  non-Intel CPUs; AMD machine-check reporting uses the kernel's EDAC
+  drivers. Found by the VM smoke test on an AMD CI host.
+
 ## Secure Boot
 
 Fedora's shim and GRUB are signed by Microsoft's third-party CA, so a MadOS

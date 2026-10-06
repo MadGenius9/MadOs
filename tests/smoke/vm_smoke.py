@@ -144,8 +144,11 @@ def run(ns: argparse.Namespace) -> int:
         boot = fields(m.group(1))
         report.add("boot", "pass", f"{time.monotonic() - started:.0f}s, version={boot.get('version')} kernel={boot.get('kernel')}")
         failed_units = boot.get("failed", "unknown")
+        # boot-report prints failed units' log lines just before MADOS_BOOT_OK.
+        unit_logs = re.findall(r"MADOS_UNIT_LOG (.*)", serial.text[: m.end()])
         report.add("units", "pass" if failed_units == "none" else "fail",
-                   f"state={boot.get('state')} failed={failed_units}")
+                   f"state={boot.get('state')} failed={failed_units}"
+                   + ("".join(f"\n         {l}" for l in unit_logs[:10]) if unit_logs else ""))
         selinux = boot.get("selinux")
         if selinux is None:
             report.add("selinux", "skip", "marker has no selinux field (older image)")

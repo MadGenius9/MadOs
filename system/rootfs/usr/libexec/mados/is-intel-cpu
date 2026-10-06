@@ -1,0 +1,3 @@
+#!/bin/sh
+# Exit 0 on Intel CPUs, 1 otherwise (systemd ExecCondition: 1 = skip unit).
+grep -q '^vendor_id[[:space:]]*:[[:space:]]*GenuineIntel' /proc/cpuinfo

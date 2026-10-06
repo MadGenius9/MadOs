@@ -237,6 +237,8 @@ def validate_staging(tree: Path) -> None:
     variant = info.get("variant")
     autologin = tree / "etc/sddm.conf.d/50-mados-dev-autologin.conf"
     check(autologin.exists() == (variant == "dev"), "SDDM autologin must exist only in dev variant")
+    check((tree / "etc/plasma-setup-done").exists() == (variant == "dev"),
+          "Plasma Setup may be marked done only in dev images (release images need it to create the first user)")
     session_check = tree / "usr/lib/systemd/user/mados-session-check.service"
     check(session_check.exists() == (variant == "dev"), "session check unit must exist only in dev variant")
     link = tree / "usr/lib/systemd/user/graphical-session.target.wants/mados-session-check.service"
@@ -290,6 +292,7 @@ def validate_shell() -> None:
     scripts = [str(p) for p in sorted(ROOT.glob("scripts/*.sh"))] + [
         str(ROOT / "system/rootfs/usr/libexec/mados/merge-os-release"),
         str(ROOT / "system/rootfs/usr/libexec/mados/image-finalize"),
+        str(ROOT / "system/rootfs/usr/libexec/mados/is-intel-cpu"),
     ]
     scripts += [str(p) for p in sorted(ROOT.glob("tests/**/*.sh"))]
     run(["shellcheck", "-x", *scripts], "shellcheck", cwd=ROOT)

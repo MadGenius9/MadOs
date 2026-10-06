@@ -21,6 +21,7 @@ use std::process::Command;
 use std::time::{Duration, Instant};
 
 const SYSTEMCTL: &str = "/usr/bin/systemctl";
+const JOURNALCTL: &str = "/usr/bin/journalctl";
 /// Present only in development images (system/variants/dev).
 const SESSION_CHECK_UNIT: &str = "/usr/lib/systemd/user/mados-session-check.service";
 /// The session check may take up to 4 apps x 90 s plus 30 s for audio;
@@ -57,6 +58,18 @@ pub fn run(args: &[&str]) -> i32 {
                 .join(",")
         })
         .unwrap_or_default();
+    // Last log lines of failed units, so a failed smoke test is diagnosable
+    // from the serial console alone.
+    for unit in failed.split(',').filter(|u| !u.is_empty()).take(5) {
+        let log = Command::new(JOURNALCTL)
+            .args(["-b", "-u", unit, "-n", "5", "-o", "cat", "--no-pager"])
+            .output()
+            .map(|o| String::from_utf8_lossy(&o.stdout).into_owned())
+            .unwrap_or_default();
+        for line in log.lines().filter(|l| !l.trim().is_empty()) {
+            println!("MADOS_UNIT_LOG {unit}: {}", line.chars().take(200).collect::<String>());
+        }
+    }
     let kernel = std::fs::read_to_string("/proc/sys/kernel/osrelease").unwrap_or_default();
     let selinux = selinux_mode(std::fs::read_to_string("/sys/fs/selinux/enforce").ok().as_deref());
     println!(

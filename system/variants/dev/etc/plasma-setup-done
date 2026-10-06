@@ -1,0 +1,4 @@
+# DEVELOPMENT IMAGES ONLY. Marks KDE's first-boot wizard (Plasma Setup) as
+# done: dev disks get their user from scripts/build-disk.sh, and the wizard
+# would otherwise take over the autologin session. Release images keep the
+# wizard, which creates the first account.
