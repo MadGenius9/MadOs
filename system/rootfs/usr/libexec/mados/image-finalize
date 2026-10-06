@@ -1,0 +1,25 @@
+#!/bin/sh
+# Runs once inside the image build (image/Containerfile), after the MadOS
+# staging tree has been copied in. Not used on running systems.
+set -eu
+
+log() { echo "image-finalize: $*"; }
+
+# 1. os-release: merge MadOS identity into the base file.
+base=/usr/lib/os-release
+frag=/usr/lib/mados/os-release.mados
+/usr/libexec/mados/merge-os-release "$base" "$frag" > "$base.new"
+mv "$base.new" "$base"
+if [ ! -L /etc/os-release ]; then
+    ln -sf ../usr/lib/os-release /etc/os-release
+fi
+log "os-release: $(grep '^PRETTY_NAME=' "$base")"
+
+# 2. Enable MadOS units according to presets.
+systemctl preset mados-boot-report.service
+log "enabled mados-boot-report.service"
+
+# 3. Icon cache (best effort; missing cache only slows icon lookup).
+if command -v gtk-update-icon-cache >/dev/null 2>&1; then
+    gtk-update-icon-cache -q -f /usr/share/icons/hicolor || true
+fi

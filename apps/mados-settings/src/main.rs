@@ -100,14 +100,22 @@ fn build(app: &gtk::Application) {
         .default_height(640)
         .child(&layout)
         .build();
-    if let Ok(page) = std::env::var("MADOS_SETTINGS_PAGE") {
+    if let Some(page) = initial_page() {
         stack.set_visible_child_name(&page);
     }
     window.present();
 }
 
+/// `--page=NAME` (e.g. from the About launcher) or `MADOS_SETTINGS_PAGE`.
+fn initial_page() -> Option<String> {
+    std::env::args()
+        .find_map(|a| a.strip_prefix("--page=").map(str::to_string))
+        .or_else(|| std::env::var("MADOS_SETTINGS_PAGE").ok())
+}
+
 fn main() -> glib::ExitCode {
     let app = gtk::Application::builder().application_id(APP_ID).build();
     app.connect_activate(build);
-    app.run()
+    // Our own flags are handled above; GTK sees only the program name.
+    app.run_with_args(&std::env::args().take(1).collect::<Vec<_>>())
 }

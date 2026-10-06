@@ -107,7 +107,7 @@ impl Product {
         Self::from_file(Path::new(crate::names::PRODUCT_FILE)).unwrap_or_else(|_| Self::embedded())
     }
 
-    /// "MadOS 0.1.0-dev"
+    /// Name and version, e.g. "Example 0.1.0-dev".
     pub fn display_name(&self) -> String {
         format!("{} {}", self.product.name, self.version.full())
     }

@@ -388,11 +388,11 @@ mod tests {
     #[test]
     fn os_release_parsing() {
         let m = parse_os_release(
-            "# comment\nNAME=\"MadOS\"\nID=fedora\nPRETTY_NAME='MadOS 0.1'\nBAD LINE\nVERSION_ID=44\n",
+            "# comment\nNAME=\"TestOS\"\nID=fedora\nPRETTY_NAME='TestOS 0.1'\nBAD LINE\nVERSION_ID=44\n",
         );
-        assert_eq!(m["NAME"], "MadOS");
+        assert_eq!(m["NAME"], "TestOS");
         assert_eq!(m["ID"], "fedora");
-        assert_eq!(m["PRETTY_NAME"], "MadOS 0.1");
+        assert_eq!(m["PRETTY_NAME"], "TestOS 0.1");
         assert_eq!(m["VERSION_ID"], "44");
         assert!(!m.contains_key("BAD LINE"));
     }

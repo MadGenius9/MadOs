@@ -44,7 +44,9 @@ pub fn about_text(i: &mados_core::SystemInfo) -> String {
         ("Product", format!("{} {}", i.product_name, i.product_version)),
         (
             "Build",
-            i.build_id.clone().unwrap_or_else(|| "Not a MadOS image build".into()),
+            i.build_id
+                .clone()
+                .unwrap_or_else(|| format!("Not a {} image build", i.product_name)),
         ),
         (
             "Base",

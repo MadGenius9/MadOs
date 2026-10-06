@@ -1,0 +1,62 @@
+# EXPERIMENTAL: Anaconda installer environment for the MadOS ISO.
+#
+# Built by scripts/build-iso.sh and turned into an ISO with image-builder's
+# bootc-generic-iso type. The MadOS image itself is embedded in the ISO
+# (--bootc-installer-payload-ref) and installed by Anaconda from local
+# container storage, so installation works offline.
+#
+# Adapted from the osbuild image-builder documentation ("ISOs"). Upstream
+# notes a known issue: systemd-remount-fs.service fails on Anaconda-installed
+# bootc systems. See docs/development/building.md.
+
+ARG INSTALLER_BASE_IMAGE=quay.io/fedora/fedora-bootc
+ARG FEDORA_VERSION=44
+FROM ${INSTALLER_BASE_IMAGE}:${FEDORA_VERSION}
+
+RUN dnf install -qy \
+        anaconda anaconda-install-img-deps anaconda-dracut \
+        dracut-config-generic dracut-network net-tools \
+        grub2-efi-x64-cdboot plymouth \
+        default-fonts-core-sans default-fonts-other-sans \
+        xorrisofs squashfs-tools \
+    && dnf clean all
+
+RUN mkdir -p /boot/efi && cp -ra /usr/lib/efi/*/*/EFI /boot/efi
+
+ARG ISO_LABEL
+ARG PRODUCT_NAME
+ARG PAYLOAD_REF
+ARG TARGET_REF
+RUN test -n "${ISO_LABEL}" && test -n "${PAYLOAD_REF}" && test -n "${TARGET_REF}" \
+    && mkdir -p /usr/lib/image-builder/bootc \
+    && printf '%s\n' \
+        "label: \"${ISO_LABEL}\"" \
+        "grub2:" \
+        "  entries:" \
+        "    - name: \"Install ${PRODUCT_NAME}\"" \
+        "      linux: \"/images/pxeboot/vmlinuz inst.stage2=hd:LABEL=${ISO_LABEL} console=tty0 inst.graphical selinux=0 rhgb quiet\"" \
+        "      initrd: \"/images/pxeboot/initrd.img\"" \
+        > /usr/lib/image-builder/bootc/iso.yaml \
+    && printf 'bootc --source-imgref containers-storage:%s --target-imgref %s\n' \
+        "${PAYLOAD_REF}" "${TARGET_REF}" > /usr/share/anaconda/interactive-defaults.ks
+
+# The following is normally done by lorax to make Anaconda work; this is the
+# minimum documented by upstream. selinux=0 above applies to the installer
+# live environment only, never to the installed system (docs/security.md).
+RUN echo "install:x:0:0:root:/root:/usr/libexec/anaconda/run-anaconda" >> /etc/passwd \
+    && echo "install::14438:0:99999:7:::" >> /etc/shadow \
+    && passwd -d root
+RUN mv /usr/share/anaconda/list-harddrives-stub /usr/bin/list-harddrives \
+    && mv /etc/yum.repos.d /etc/anaconda.repos.d \
+    && ln -s /lib/systemd/system/anaconda.target /etc/systemd/system/default.target \
+    && rm -v /usr/lib/systemd/system-generators/systemd-gpt-auto-generator
+RUN ln -s /usr/lib/systemd/system/anaconda-shell@.service /usr/lib/systemd/system/autovt@.service
+RUN mkdir -p /usr/lib/systemd/logind.conf.d \
+    && printf '[Login]\nReserveVT=2\n' > /usr/lib/systemd/logind.conf.d/anaconda-shell.conf
+RUN mkdir "$(realpath /root)" \
+    && kernel=$(kernel-install list --json pretty | jq -r '.[] | select(.has_kernel == true) | .version') \
+    && DRACUT_NO_XATTR=1 dracut --force -v --zstd --reproducible --no-hostonly \
+        --add "anaconda" "/usr/lib/modules/${kernel}/initramfs.img" "${kernel}"
+RUN mkdir -p /etc/systemd/user/pipewire.service.d /etc/systemd/user/pipewire.socket.d \
+    && printf '[Unit]\nConditionUser=\n' > /etc/systemd/user/pipewire.service.d/allowroot.conf \
+    && printf '[Unit]\nConditionUser=\n' > /etc/systemd/user/pipewire.socket.d/allowroot.conf

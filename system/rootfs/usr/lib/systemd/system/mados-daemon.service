@@ -1,0 +1,32 @@
+[Unit]
+Description=System API service (mados-daemon)
+Documentation=https://github.com/MadGenius9/MadOs/blob/master/docs/architecture/overview.md
+
+[Service]
+# Started on demand by D-Bus activation (org.mados.System1).
+Type=dbus
+BusName=org.mados.System1
+ExecStart=/usr/libexec/mados/mados-daemon
+SyslogIdentifier=mados-daemon
+Restart=on-failure
+
+# Hardening. The daemon needs root only to read deployment state (bootc) and
+# to call logind after its own polkit check; it needs no network, no home
+# directories and no writable /usr or /etc.
+NoNewPrivileges=yes
+ProtectSystem=full
+ProtectHome=yes
+PrivateTmp=yes
+PrivateNetwork=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+RestrictAddressFamilies=AF_UNIX
+SystemCallArchitectures=native

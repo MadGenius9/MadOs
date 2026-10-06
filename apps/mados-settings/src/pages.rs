@@ -10,6 +10,10 @@ use mados_core::{Product, SystemInfo};
 use std::cell::RefCell;
 use std::rc::Rc;
 
+fn product_name() -> String {
+    Product::load().product.name
+}
+
 fn na() -> String {
     "Unavailable".into()
 }
@@ -76,7 +80,12 @@ pub fn about(product: &Product) -> gtk::Widget {
 fn fill_about(g: &mut InfoGrid, i: &SystemInfo) {
     g.clear();
     g.row("Version", &format!("{} {}", i.product_name, i.product_version));
-    g.row("Build ID", i.build_id.as_deref().unwrap_or("Not a MadOS image build"));
+    g.row(
+        "Build ID",
+        &i.build_id
+            .clone()
+            .unwrap_or_else(|| format!("Not a {} image build", i.product_name)),
+    );
     if let Some(v) = &i.variant {
         g.row("Image variant", v);
     }
@@ -200,7 +209,7 @@ pub fn storage() -> gtk::Widget {
 pub fn power() -> gtk::Widget {
     let (root, content) = widgets::page(
         "Power",
-        Some("Restart and shut down go through the MadOS system service and are authorized by polkit."),
+        Some("Restart and shut down go through the system service and are authorized by polkit."),
     );
     let status = widgets::status_label();
     let row = gtk::Box::new(gtk::Orientation::Horizontal, 12);
@@ -215,7 +224,10 @@ pub fn power() -> gtk::Widget {
     content.append(&status);
     content.append(
         &gtk::Label::builder()
-            .label("Battery, suspend and power-profile settings: not yet implemented in MadOS Settings.")
+            .label(format!(
+                "Battery, suspend and power-profile settings: not yet implemented in {} Settings.",
+                product_name()
+            ))
             .xalign(0.0)
             .wrap(true)
             .css_classes(["dim-label"])
@@ -266,7 +278,10 @@ pub fn power() -> gtk::Widget {
 pub fn updates() -> gtk::Widget {
     let (root, content) = widgets::page(
         "Updates",
-        Some("MadOS is image-based: updates install as a new deployment and the previous one is kept for rollback."),
+        Some(&format!(
+            "{} is image-based: updates install as a new deployment and the previous one is kept for rollback.",
+            product_name()
+        )),
     );
     let grid = Rc::new(RefCell::new(InfoGrid::new()));
     content.append(&grid.borrow().grid);
@@ -450,7 +465,8 @@ pub fn unavailable(title: &str, kcm: Option<&'static str>) -> gtk::Widget {
     content.append(
         &gtk::Label::builder()
             .label(format!(
-                "{title} settings are not yet implemented in MadOS Settings (development build)."
+                "{title} settings are not yet implemented in {} Settings (development build).",
+                product_name()
             ))
             .xalign(0.0)
             .wrap(true)

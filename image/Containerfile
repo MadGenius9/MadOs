@@ -1,0 +1,79 @@
+# MadOS 0.1 bootable container image (bootc). See ADR-001.
+#
+# Build with scripts/build-image.sh (make image); it supplies the build args
+# from image/config.env and the git tree. Build context: repository root.
+
+ARG FEDORA_VERSION=44
+ARG BUILDER_IMAGE=quay.io/fedora/fedora
+ARG BASE_REF=quay.io/fedora-ostree-desktops/kinoite:44
+
+# ---------------------------------------------------------------------------
+# Stage 1: compile MadOS components against the target Fedora release.
+# ---------------------------------------------------------------------------
+FROM ${BUILDER_IMAGE}:${FEDORA_VERSION} AS builder
+
+RUN dnf -y install --setopt=install_weak_deps=False \
+        cargo rust gcc pkgconf-pkg-config \
+        gtk4-devel dbus-devel \
+        python3 librsvg2-tools \
+    && dnf clean all
+
+WORKDIR /src
+COPY Cargo.toml Cargo.lock rustfmt.toml ./
+COPY crates crates
+COPY services services
+COPY apps apps
+COPY product product
+RUN --mount=type=cache,target=/root/.cargo/registry \
+    --mount=type=cache,target=/src/target \
+    cargo build --release --locked \
+    && mkdir -p /out/bin \
+    && cp target/release/madosctl target/release/mados-daemon \
+          target/release/mados-ai target/release/mados-settings /out/bin/
+
+COPY scripts/stage-system.py scripts/product.py scripts/
+COPY system system
+
+ARG MADOS_VARIANT=dev
+ARG GIT_COMMIT=unknown
+ARG BUILD_ID=unknown
+ARG BASE_REF
+RUN python3 scripts/stage-system.py \
+        --bin-dir /out/bin \
+        --destdir /staging \
+        --variant "${MADOS_VARIANT}" \
+        --build-id "${BUILD_ID}" \
+        --git-commit "${GIT_COMMIT}" \
+        --base-image "${BASE_REF}"
+
+# ---------------------------------------------------------------------------
+# Stage 2: the operating system image.
+# ---------------------------------------------------------------------------
+FROM ${BASE_REF}
+
+# Upstream applications used as-is in 0.1 (see docs/architecture/overview.md):
+# Konsole (terminal), Dolphin (files), Firefox (browser).
+# qemu-guest-agent lets the VM smoke test request clean reboot/shutdown; it
+# only activates when a virtio guest-agent port exists (VMs), and Fedora's
+# default configuration blocks guest-exec/file RPCs.
+RUN dnf -y install --setopt=install_weak_deps=False \
+        konsole dolphin firefox qemu-guest-agent \
+    && dnf clean all \
+    && rm -rf /var/cache/* /var/lib/dnf /var/log/*
+
+COPY --from=builder /staging/ /
+
+# Merge MadOS identity into the base os-release (keeps ID=fedora; ADR-001),
+# compile settings and enable MadOS units.
+RUN /usr/libexec/mados/image-finalize \
+    && rm -rf /var/cache/* /var/log/* /tmp/*
+
+ARG PRODUCT_NAME
+ARG PRODUCT_VERSION
+ARG MADOS_VARIANT=dev
+LABEL org.opencontainers.image.title="${PRODUCT_NAME}" \
+      org.opencontainers.image.version="${PRODUCT_VERSION}" \
+      org.opencontainers.image.description="${PRODUCT_NAME} ${MADOS_VARIANT} image (bootc)" \
+      containers.bootc=1
+
+RUN bootc container lint

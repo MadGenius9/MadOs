@@ -1,0 +1,20 @@
+[Unit]
+Description=Boot report for smoke tests (mados-boot-report)
+Documentation=https://github.com/MadGenius9/MadOs/blob/master/docs/development/testing.md
+After=graphical.target
+
+[Service]
+# Writes MADOS_BOOT_OK / MADOS_SESSION_* markers to the journal and console
+# (the serial port in test VMs), and MADOS_SHUTDOWN when stopped.
+Type=simple
+RemainAfterExit=yes
+ExecStart=/usr/bin/madosctl boot-report --session-timeout 240
+ExecStop=/usr/bin/madosctl boot-report --stop
+StandardOutput=journal+console
+SyslogIdentifier=mados-boot-report
+NoNewPrivileges=yes
+ProtectHome=yes
+PrivateTmp=yes
+
+[Install]
+WantedBy=graphical.target

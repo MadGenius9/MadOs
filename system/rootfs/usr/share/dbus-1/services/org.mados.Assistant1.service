@@ -1,0 +1,4 @@
+[D-BUS Service]
+Name=org.mados.Assistant1
+Exec=/usr/libexec/mados/mados-ai serve
+SystemdService=mados-ai.service

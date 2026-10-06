@@ -1,0 +1,2 @@
+# MadOS units enabled by default.
+enable mados-boot-report.service

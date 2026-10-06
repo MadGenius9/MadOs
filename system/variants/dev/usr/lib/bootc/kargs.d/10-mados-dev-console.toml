@@ -1,0 +1,4 @@
+# Development images: mirror the console to the first serial port so the VM
+# smoke test (tests/smoke) can read boot markers. Not used in release images.
+kargs = ["console=tty0", "console=ttyS0,115200n8"]
+match-architectures = ["x86_64"]

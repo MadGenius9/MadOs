@@ -1,0 +1,14 @@
+[Unit]
+Description=Assistant service (mados-ai)
+Documentation=https://github.com/MadGenius9/MadOs/blob/master/docs/architecture/ADR-003-mados-ai.md
+PartOf=graphical-session.target
+
+[Service]
+# Started on demand by D-Bus activation (org.mados.Assistant1). Runs as the
+# user with no extra privileges.
+Type=dbus
+BusName=org.mados.Assistant1
+ExecStart=/usr/libexec/mados/mados-ai serve
+SyslogIdentifier=mados-ai
+Restart=on-failure
+NoNewPrivileges=yes

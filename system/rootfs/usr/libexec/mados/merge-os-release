@@ -1,0 +1,34 @@
+#!/bin/sh
+# Usage: merge-os-release BASE_OS_RELEASE MADOS_FRAGMENT > merged
+#
+# Replaces the presentation keys of the base os-release with the MadOS values
+# in FRAGMENT and records the base PRETTY_NAME as MADOS_BASE_PRETTY_NAME.
+# Compatibility keys (ID, ID_LIKE, VERSION_ID, VARIANT_ID, PLATFORM_ID, ...)
+# are kept from the base on purpose; see ADR-001.
+set -eu
+[ $# -eq 2 ] || { echo "usage: $0 BASE FRAGMENT" >&2; exit 2; }
+[ -r "$1" ] || { echo "$0: cannot read $1" >&2; exit 1; }
+[ -r "$2" ] || { echo "$0: cannot read $2" >&2; exit 1; }
+awk -v frag="$2" '
+BEGIN {
+    n = 0
+    while ((getline line < frag) > 0) {
+        if (line ~ /^[A-Z][A-Z0-9_]*=/) {
+            k = substr(line, 1, index(line, "=") - 1)
+            repl[k] = 1
+            add[++n] = line
+        }
+    }
+    close(frag)
+}
+/^PRETTY_NAME=/ { base_pretty = substr($0, index($0, "=") + 1) }
+{
+    k = (index($0, "=") > 0) ? substr($0, 1, index($0, "=") - 1) : ""
+    if (k == "" || !(k in repl)) print
+}
+END {
+    if (base_pretty != "" && !("MADOS_BASE_PRETTY_NAME" in repl))
+        print "MADOS_BASE_PRETTY_NAME=" base_pretty
+    for (i = 1; i <= n; i++) print add[i]
+}
+' "$1"

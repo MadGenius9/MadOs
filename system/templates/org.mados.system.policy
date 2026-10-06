@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE policyconfig PUBLIC "-//freedesktop//DTD polkit Policy Configuration 1.0//EN"
+ "http://www.freedesktop.org/software/polkit/policyconfig-1.dtd">
+<!-- Generated from product/product.toml by scripts/stage-system.py. -->
+<policyconfig>
+  <vendor>@VENDOR@</vendor>
+  <vendor_url>@VENDOR_URL@</vendor_url>
+
+  <!-- Mirrors logind's defaults for power-off/reboot: the user at the active
+       local session may, everyone else must authenticate as admin. -->
+  <action id="org.mados.system.power">
+    <description>Shut down or restart the system</description>
+    <message>Authentication is required to shut down or restart the system</message>
+    <defaults>
+      <allow_any>auth_admin_keep</allow_any>
+      <allow_inactive>auth_admin_keep</allow_inactive>
+      <allow_active>yes</allow_active>
+    </defaults>
+  </action>
+</policyconfig>

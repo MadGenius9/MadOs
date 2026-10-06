@@ -30,7 +30,7 @@ fn fixture() -> tempfile::TempDir {
     write(
         r,
         "etc/os-release",
-        "NAME=\"MadOS\"\nID=fedora\nPRETTY_NAME=\"MadOS 0.1.0-dev\"\nMADOS_BASE_PRETTY_NAME=\"Fedora Linux 44 (Kinoite)\"\n",
+        "NAME=\"TestOS\"\nID=fedora\nPRETTY_NAME=\"TestOS 0.1.0-dev\"\nMADOS_BASE_PRETTY_NAME=\"Fedora Linux 44 (Kinoite)\"\n",
     );
     write(
         r,
