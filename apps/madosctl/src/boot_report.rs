@@ -117,7 +117,16 @@ fn relay_session_check(uid: u32, timeout: Duration) {
         }
         std::thread::sleep(Duration::from_secs(2));
     }
-    println!("MADOS_APPS_NONE reason=timeout");
+    // Say whether the user's runtime directory was visible at all, so a
+    // sandboxing problem is distinguishable from a session check that never ran.
+    let runtime = if path.parent().is_some_and(|p| p.exists()) {
+        "report-dir-present"
+    } else if path.ancestors().nth(2).is_some_and(|p| p.exists()) {
+        "runtime-dir-present"
+    } else {
+        "runtime-dir-missing"
+    };
+    println!("MADOS_APPS_NONE reason=timeout {runtime}");
 }
 
 fn usage() -> i32 {

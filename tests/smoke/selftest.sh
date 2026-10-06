@@ -66,5 +66,5 @@ exec python3 "$ROOT/tests/smoke/vm_smoke.py" \
     --kernel "$kernel" --initrd "$WORK/initramfs.img" \
     --append "console=ttyS0 panic=-1 quiet" \
     --workdir "$WORK/run" --memory 512 --cpus 1 \
-    --timeout 600 --session-timeout 30 --apps-timeout 30 --agent-timeout 3 --no-reboot \
+    --timeout 600 --session-timeout 30 --apps-timeout 30 --agent-timeout 3 --no-reboot --settle 1 \
     --shutdown-timeout 120

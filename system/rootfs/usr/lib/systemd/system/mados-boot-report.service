@@ -13,7 +13,9 @@ ExecStop=/usr/bin/madosctl boot-report --stop
 StandardOutput=journal+console
 SyslogIdentifier=mados-boot-report
 NoNewPrivileges=yes
-ProtectHome=yes
+# read-only, not yes: ProtectHome=yes also hides /run/user, where the dev
+# session check leaves its report (/run/user/UID/mados/session-check.json).
+ProtectHome=read-only
 PrivateTmp=yes
 
 [Install]

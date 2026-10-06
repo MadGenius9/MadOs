@@ -162,6 +162,23 @@ def run(ns: argparse.Namespace) -> int:
             report.add("session", "fail" if ns.require_session else "skip", detail)
         session_ok = bool(m and m.group(1) == "OK")
 
+        # 5. screenshot — early, before the screen locker or DPMS blank it.
+        if session_ok:
+            time.sleep(ns.settle)
+        try:
+            qmp = vm.Qmp(cfg.qmp_sock)
+            shot = workdir / "screen.png"
+            try:
+                qmp.execute("screendump", filename=str(shot), format="png")
+            except RuntimeError:
+                shot = workdir / "screen.ppm"
+                qmp.execute("screendump", filename=str(shot))
+            report.add("screenshot", "pass", str(shot))
+        except (OSError, TimeoutError, RuntimeError, ConnectionError) as e:
+            qmp = None
+            report.add("screenshot", "skip", str(e))
+
+
         # apps + audio (relayed from the dev-only session check)
         m = serial.wait_for(APPS_RE, ns.apps_timeout, proc, boot_end) if session_ok else None
         if m and not m.group(1):
@@ -202,20 +219,6 @@ def run(ns: argparse.Namespace) -> int:
         else:
             report.add("network", "skip", "guest agent not reachable")
 
-        # 5. screenshot
-        try:
-            qmp = vm.Qmp(cfg.qmp_sock)
-            shot = workdir / "screen.png"
-            try:
-                qmp.execute("screendump", filename=str(shot), format="png")
-            except RuntimeError:
-                shot = workdir / "screen.ppm"
-                qmp.execute("screendump", filename=str(shot))
-            report.add("screenshot", "pass", str(shot))
-        except (OSError, TimeoutError, RuntimeError, ConnectionError) as e:
-            qmp = None
-            report.add("screenshot", "skip", str(e))
-
         # 6. reboot
         if ns.reboot and ga:
             mark = len(serial.text)
@@ -234,14 +237,19 @@ def run(ns: argparse.Namespace) -> int:
 
         # 7. shutdown
         mark = len(serial.text)
-        if ga:
-            ga.execute("guest-shutdown", expect_reply=False, mode="powerdown")
-            how = "guest agent"
-        elif qmp:
-            qmp.execute("system_powerdown")
-            how = "ACPI power button"
-        else:
-            how = "guest-initiated"
+        how = "guest-initiated"
+        if proc.poll() is None:
+            # The guest may power itself off between our checks; a vanished
+            # socket then means "already down", not a harness error.
+            try:
+                if ga:
+                    ga.execute("guest-shutdown", expect_reply=False, mode="powerdown")
+                    how = "guest agent"
+                elif qmp:
+                    qmp.execute("system_powerdown")
+                    how = "ACPI power button"
+            except (OSError, ConnectionError, RuntimeError):
+                pass
         try:
             proc.wait(timeout=ns.shutdown_timeout)
             serial.poll()
@@ -284,6 +292,7 @@ def main(argv: list[str]) -> int:
     ap.add_argument("--shutdown-timeout", type=int, default=300)
     ap.add_argument("--require-session", action="store_true", help="fail if no graphical session")
     ap.add_argument("--require-apps", action="store_true", help="fail if the dev session check does not report")
+    ap.add_argument("--settle", type=int, default=20, help="seconds to let the desktop draw before the screenshot")
     ap.add_argument("--apps-timeout", type=int, default=600)
     ap.add_argument("--no-reboot", dest="reboot", action="store_false")
     ns = ap.parse_args(argv)

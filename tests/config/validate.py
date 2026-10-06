@@ -163,6 +163,9 @@ def validate_units(tree: Path) -> None:
         check(bool(exe) and exe[0].startswith("/"), f"{rel}: ExecStart must use an absolute path")
         check(cp.get("Service", "NoNewPrivileges", fallback="") == "yes", f"{rel}: NoNewPrivileges=yes required")
         check(bool(cp.get("Service", "SyslogIdentifier", fallback="")), f"{rel}: SyslogIdentifier required (journald)")
+        if "boot-report" in u.name:
+            check(cp.get("Service", "ProtectHome", fallback="") != "yes",
+                  f"{rel}: ProtectHome=yes hides /run/user, where the session check report lives")
         if exe and tree != ROOT / "system/rootfs":
             check((tree / exe[0].lstrip("/")).exists(), f"{rel}: ExecStart binary {exe[0]} not staged")
     if tree != ROOT / "system/rootfs" and shutil.which("systemd-analyze"):

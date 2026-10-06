@@ -16,6 +16,7 @@ KDE Plasma (Fedora Kinoite) as a temporary bootstrap, and this README says so.
 |---|---|
 | Bootable container image (bootc, Fedora 44 Kinoite base) | **builds in CI** (GitHub Actions job `image`): components compile against Fedora 44, `bootc container lint` passes. Cannot be built in the bootstrap dev environment (Fedora servers blocked) |
 | qcow2 disk image via image-builder | **builds in CI** |
+| **SELinux enforcing, MadOS identity at boot** | **verified in CI run #4**: `selinux=enforcing`, no failed units, systemd banner "Welcome to MadOS 0.1.0-dev!" (os-release branding), Wayland KDE session. The run failed later only because the boot report's sandbox (`ProtectHome=yes`) hid the dev session check's report in `/run/user`; fixed, re-running |
 | **Boots in QEMU/KVM (UEFI)** | **verified in CI run #2**: `MADOS_BOOT_OK` 57 s after power-on (version 0.1.0-dev, Fedora kernel 7.2.8-200.fc44), `graphical.target` reached with **no failed units**, active **Wayland KDE session**, network up (DHCP 10.0.2.15), clean **reboot** to a second successful boot, clean **shutdown** (QEMU exit 0) |
 | Installer ISO (`bootc-generic-iso`) | written, with an unattended install test (`make iso-test`); **experimental**, not yet built |
 | MadOS components (Rust) | 57 unit/integration tests: D-Bus policy tests on a private bus; mock NetworkManager/BlueZ/AccountsService/logind; fake and simulated bootc; real PulseAudio server |
@@ -54,8 +55,9 @@ KDE Plasma (Fedora Kinoite) as a temporary bootstrap, and this README says so.
 
 ### Implemented but unverified
 
-On the booted image: launching Konsole/Dolphin/Firefox/Settings and audio
-device detection (smoke checks added after run #2), SELinux enforcing check,
+On the booted image: launching Konsole/Dolphin/Firefox/Settings, audio
+device detection and the MadOS services check (run #4 could not read their
+report; fixed),
 MadOS branding in Plasma (screenshot captured, not yet reviewed), and all
 MadOS services against the *real* polkit, logind, NetworkManager, BlueZ,
 AccountsService, PipeWire and bootc. The installer ISO.
