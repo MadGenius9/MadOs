@@ -33,11 +33,19 @@
 
 ## Service hardening
 
-`mados-daemon.service`: `NoNewPrivileges`, `ProtectSystem=full`,
-`ProtectHome`, `PrivateTmp`, `PrivateNetwork`, kernel tunables/modules/logs
-protection, `RestrictAddressFamilies=AF_UNIX`, `MemoryDenyWriteExecute`,
-`SystemCallArchitectures=native`. Its D-Bus policy lets only root own
-`org.mados.System1`.
+`mados-daemon.service`: `NoNewPrivileges`, `ProtectHome`, `PrivateTmp`,
+kernel tunables/modules/logs protection, clock/hostname/control-group
+protection, `RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6 AF_NETLINK`,
+`MemoryDenyWriteExecute`, `SystemCallArchitectures=native`. Its D-Bus policy
+lets only root own `org.mados.System1`.
+
+**Deliberately not set:** `PrivateNetwork=` and `ProtectSystem=`. The daemon
+runs `bootc upgrade`/`rollback` (after polkit admin authorization), and
+bootc must reach the image registry and write `/sysroot` (OSTree
+repository) and `/boot` (boot entries). These were set in the first 0.1
+draft, which would have broken updates on a real system. Planned (M7): move
+the bootc mutations into a separate, socket- or D-Bus-activated helper unit
+so the long-running daemon can be sandboxed again.
 
 ## Development-only weakenings (prominently documented)
 

@@ -11,6 +11,8 @@ Boots an image in QEMU (UEFI) and checks, in order:
      apps       MADOS_APPS (dev images): terminal, file manager, browser and
                 settings each started and claimed their D-Bus name
      audio      MADOS_APPS audio=ok: sound card + PipeWire default sink
+     services   MADOS_APPS daemon/bootc/assistant=ok: MadOS's own services
+                answer on the real system and session buses
   4. network    a non-loopback interface with an IPv4 address (guest agent)
   5. screenshot QMP screendump of the display (artifact for humans)
   6. reboot     clean reboot via the guest agent; a second MADOS_BOOT_OK
@@ -173,10 +175,17 @@ def run(ns: argparse.Namespace) -> int:
             report.add("apps", "fail" if bad else "pass", detail)
             audio = res.get("audio", "unknown")
             report.add("audio", {"ok": "pass", "unknown": "skip"}.get(audio, "fail"), f"audio={audio}")
+            svc = {k: res.get(k) for k in ("daemon", "bootc", "assistant")}
+            if all(v is None for v in svc.values()):
+                report.add("services", "skip", "image predates the services check")
+            else:
+                ok = all(v == "ok" for v in svc.values())
+                report.add("services", "pass" if ok else "fail", " ".join(f"{k}={v}" for k, v in svc.items()))
         else:
             why = "no graphical session" if not session_ok else (m.group(2) if m else "no MADOS_APPS marker")
             report.add("apps", "fail" if ns.require_apps else "skip", why)
             report.add("audio", "skip", why)
+            report.add("services", "skip", why)
 
         # 4. network via guest agent
         ga = guest_agent(cfg, ns.agent_timeout)

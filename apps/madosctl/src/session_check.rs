@@ -73,6 +73,15 @@ pub struct Report {
     pub apps: Vec<AppResult>,
     /// "ok" (device and default sink), "no-device", "no-sink", "unknown".
     pub audio: String,
+    /// org.mados.System1 reachable from the session (system bus activation).
+    #[serde(default)]
+    pub daemon: String,
+    /// bootc deployment status through the daemon: "ok" or a short reason.
+    #[serde(default)]
+    pub bootc: String,
+    /// org.mados.Assistant1 answered a read-only request.
+    #[serde(default)]
+    pub assistant: String,
 }
 
 impl Report {
@@ -84,6 +93,15 @@ impl Report {
             .map(|a| format!("{}={}", a.name, a.outcome.as_str()))
             .collect();
         parts.push(format!("audio={}", self.audio));
+        for (k, v) in [
+            ("daemon", &self.daemon),
+            ("bootc", &self.bootc),
+            ("assistant", &self.assistant),
+        ] {
+            if !v.is_empty() {
+                parts.push(format!("{k}={v}"));
+            }
+        }
         parts.join(" ")
     }
 }
@@ -183,6 +201,58 @@ fn audio_status() -> String {
     }
 }
 
+/// One-word value for the marker (no spaces).
+fn token(s: &str) -> String {
+    s.chars()
+        .map(|c| {
+            if c.is_ascii_alphanumeric() || "-_.".contains(c) {
+                c
+            } else {
+                '-'
+            }
+        })
+        .take(40)
+        .collect()
+}
+
+/// Exercises org.mados.System1 on the system bus: (daemon, bootc).
+fn check_daemon() -> (String, String) {
+    let r = (|| -> zbus::Result<(String, String)> {
+        let conn = zbus::blocking::Connection::system()?;
+        let p = mados_api::SystemProxyBlocking::new(&conn)?;
+        let info: mados_core::SystemInfo =
+            serde_json::from_str(&p.get_system_info()?).map_err(|e| zbus::Error::Failure(e.to_string()))?;
+        let daemon = if info.product_version.is_empty() {
+            "bad-reply".to_string()
+        } else {
+            "ok".to_string()
+        };
+        let upd: mados_api::UpdateStatus =
+            serde_json::from_str(&p.get_update_status()?).map_err(|e| zbus::Error::Failure(e.to_string()))?;
+        let bootc = if upd.available {
+            "ok".into()
+        } else {
+            token(upd.message.as_deref().unwrap_or("unavailable"))
+        };
+        Ok((daemon, bootc))
+    })();
+    r.unwrap_or_else(|e| (format!("error-{}", token(&e.to_string())), "unknown".into()))
+}
+
+/// Exercises org.mados.Assistant1 on the session bus with a read-only request.
+fn check_assistant() -> String {
+    let r = (|| -> zbus::Result<mados_api::AssistantReply> {
+        let conn = zbus::blocking::Connection::session()?;
+        let json = mados_api::AssistantProxyBlocking::new(&conn)?.ask("what version am I running")?;
+        serde_json::from_str(&json).map_err(|e| zbus::Error::Failure(e.to_string()))
+    })();
+    match r {
+        Ok(reply) if reply.status == mados_api::ReplyStatus::Done => "ok".into(),
+        Ok(reply) => token(&format!("{:?}", reply.status)),
+        Err(e) => format!("error-{}", token(&e.to_string())),
+    }
+}
+
 fn report_path() -> Option<PathBuf> {
     std::env::var_os("XDG_RUNTIME_DIR").map(|d| PathBuf::from(d).join(REPORT_FILE))
 }
@@ -231,12 +301,19 @@ pub fn run(args: &[&str]) -> i32 {
         results.push(res);
         children.extend(child);
     }
+    let (daemon, bootc) = check_daemon();
     let report = Report {
         schema: REPORT_SCHEMA,
         apps: results,
         audio: audio_status(),
+        daemon,
+        bootc,
+        assistant: check_assistant(),
     };
-    println!("audio: {}", report.audio);
+    println!(
+        "audio: {} daemon: {} bootc: {} assistant: {}",
+        report.audio, report.daemon, report.bootc, report.assistant
+    );
     for mut c in children {
         let _ = c.kill();
         let _ = c.wait();
@@ -383,7 +460,11 @@ mod tests {
                 },
             ],
             audio: "ok".into(),
+            daemon: "ok".into(),
+            bootc: "ok".into(),
+            assistant: String::new(),
         };
-        assert_eq!(r.marker(), "terminal=ok browser=running audio=ok");
+        assert_eq!(r.marker(), "terminal=ok browser=running audio=ok daemon=ok bootc=ok");
+        assert_eq!(token("bootc is not installed; x"), "bootc-is-not-installed--x");
     }
 }
