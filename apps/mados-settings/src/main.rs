@@ -63,11 +63,7 @@ fn build(app: &gtk::Application) {
     };
     // Order follows docs/architecture/overview.md (Settings categories).
     add("about", "About", pages::about(&product));
-    add(
-        "network",
-        "Network & Wi-Fi",
-        pages::unavailable("Network & Wi-Fi", Some("kcm_networkmanagement")),
-    );
+    add("network", "Network & Wi-Fi", pages::network());
     add(
         "bluetooth",
         "Bluetooth",

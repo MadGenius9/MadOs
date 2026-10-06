@@ -109,21 +109,7 @@ impl SystemOps for LiveOps {
 
     fn set_wifi(&self, enabled: bool) -> BoxFuture<'_, OpResult> {
         Box::pin(async move {
-            let props = zbus::fdo::PropertiesProxy::builder(self.bus()?)
-                .destination("org.freedesktop.NetworkManager")
-                .and_then(|b| b.path("/org/freedesktop/NetworkManager"))
-                .map_err(|e| e.to_string())?
-                .build()
-                .await
-                .map_err(|e| e.to_string())?;
-            props
-                .set(
-                    "org.freedesktop.NetworkManager"
-                        .try_into()
-                        .map_err(|e: zbus::names::Error| e.to_string())?,
-                    "WirelessEnabled",
-                    Value::from(enabled),
-                )
+            mados_api::network::set_wifi_enabled(self.bus()?, enabled)
                 .await
                 .map_err(|e| format!("NetworkManager refused: {e}"))?;
             Ok(format!("Wi-Fi turned {}.", on_off(enabled)))

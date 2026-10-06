@@ -3,6 +3,7 @@
 
 use crate::bg;
 use crate::widgets::{self, InfoGrid};
+use gtk::glib;
 use gtk::prelude::*;
 use mados_api::{AssistantProxyBlocking, AssistantReply, ReplyStatus, SystemProxyBlocking, UpdateStatus};
 use mados_core::sysinfo::{self, format_bytes, SessionEnv};
@@ -445,6 +446,182 @@ pub fn assistant() -> gtk::Widget {
         confirm_row.set_visible(false);
         answer.set_label("Cancelled.");
     });
+    root.upcast()
+}
+
+// ---------------------------------------------------------------- Network
+
+fn network_status() -> zbus::Result<mados_api::network::NetworkStatus> {
+    let conn = bg::system_bus()?;
+    zbus::block_on(mados_api::network::status(conn.inner()))
+}
+
+pub fn network() -> gtk::Widget {
+    let (root, content) = widgets::page("Network & Wi-Fi", None);
+    let summary = gtk::Label::builder()
+        .xalign(0.0)
+        .wrap(true)
+        .css_classes(["heading"])
+        .build();
+    content.append(&summary);
+
+    let wifi_row = gtk::Box::builder()
+        .orientation(gtk::Orientation::Horizontal)
+        .spacing(12)
+        .css_classes(["card"])
+        .build();
+    let wifi_text = gtk::Box::new(gtk::Orientation::Vertical, 2);
+    wifi_text.append(
+        &gtk::Label::builder()
+            .label("Wi-Fi")
+            .xalign(0.0)
+            .css_classes(["heading"])
+            .build(),
+    );
+    let wifi_note = gtk::Label::builder()
+        .xalign(0.0)
+        .wrap(true)
+        .css_classes(["dim-label"])
+        .build();
+    wifi_text.append(&wifi_note);
+    wifi_text.set_hexpand(true);
+    wifi_row.append(&wifi_text);
+    let switch = gtk::Switch::builder()
+        .valign(gtk::Align::Center)
+        .sensitive(false)
+        .build();
+    wifi_row.append(&switch);
+    content.append(&wifi_row);
+
+    let grid = Rc::new(RefCell::new(InfoGrid::new()));
+    content.append(&grid.borrow().grid);
+    let status = widgets::status_label();
+    content.append(&status);
+    content.append(
+        &gtk::Label::builder()
+            .label(format!(
+                "Choosing and connecting to networks is not yet implemented in {} Settings.",
+                product_name()
+            ))
+            .xalign(0.0)
+            .wrap(true)
+            .css_classes(["dim-label"])
+            .build(),
+    );
+    let buttons = gtk::Box::new(gtk::Orientation::Horizontal, 8);
+    let refresh = gtk::Button::with_label("Refresh");
+    buttons.append(&refresh);
+    let kde = gtk::Button::builder()
+        .label("Open in KDE System Settings")
+        .sensitive(crate::kde_settings_available())
+        .build();
+    kde.connect_clicked(|_| {
+        let _ = std::process::Command::new(crate::KDE_SETTINGS)
+            .arg("kcm_networkmanagement")
+            .spawn();
+    });
+    buttons.append(&kde);
+    content.append(&buttons);
+
+    // Set while the switch is updated from NetworkManager's state, so that
+    // programmatic changes are not treated as user requests.
+    let syncing = Rc::new(std::cell::Cell::new(false));
+
+    let load: Rc<dyn Fn()> = {
+        let (grid, status, summary, switch, wifi_note, syncing) = (
+            grid.clone(),
+            status.clone(),
+            summary.clone(),
+            switch.clone(),
+            wifi_note.clone(),
+            syncing.clone(),
+        );
+        Rc::new(move || {
+            let (grid, status, summary, switch, wifi_note, syncing) = (
+                grid.clone(),
+                status.clone(),
+                summary.clone(),
+                switch.clone(),
+                wifi_note.clone(),
+                syncing.clone(),
+            );
+            bg::run(network_status, move |r| {
+                let mut g = grid.borrow_mut();
+                g.clear();
+                match r {
+                    Ok(s) => {
+                        summary.set_label(&format!("Network: {} · Internet access: {}", s.state, s.connectivity));
+                        syncing.set(true);
+                        switch.set_active(s.wifi_enabled);
+                        switch.set_state(s.wifi_enabled);
+                        syncing.set(false);
+                        let has_wifi = s.has_wifi_device();
+                        switch.set_sensitive(has_wifi && s.wifi_hardware_enabled);
+                        wifi_note.set_label(if !has_wifi {
+                            "No Wi-Fi adapter detected."
+                        } else if !s.wifi_hardware_enabled {
+                            "Wi-Fi is disabled by a hardware switch."
+                        } else if s.wifi_enabled {
+                            "Wi-Fi radio is on."
+                        } else {
+                            "Wi-Fi radio is off."
+                        });
+                        if s.devices.is_empty() {
+                            g.row("Devices", "No network devices");
+                        }
+                        for d in &s.devices {
+                            let mut text = d.state.clone();
+                            if let Some(c) = &d.connection {
+                                text.push_str(&format!(" · {c}"));
+                            }
+                            if !d.ipv4.is_empty() {
+                                text.push_str(&format!("\n{}", d.ipv4.join(", ")));
+                            }
+                            g.row(&format!("{} ({})", d.interface, d.kind), &text);
+                        }
+                    }
+                    Err(e) => {
+                        summary.set_label("Network status unavailable");
+                        switch.set_sensitive(false);
+                        status.set_label(&format!("NetworkManager: {}", bg::describe(&e)));
+                    }
+                }
+            });
+        })
+    };
+
+    {
+        let (load, status, syncing) = (load.clone(), status.clone(), syncing.clone());
+        switch.connect_state_set(move |sw, want| {
+            if syncing.get() {
+                return glib::Propagation::Proceed;
+            }
+            sw.set_sensitive(false);
+            status.set_label(if want {
+                "Turning Wi-Fi on…"
+            } else {
+                "Turning Wi-Fi off…"
+            });
+            let (load, status) = (load.clone(), status.clone());
+            bg::run(
+                move || -> zbus::Result<()> {
+                    let conn = bg::system_bus()?;
+                    zbus::block_on(mados_api::network::set_wifi_enabled(conn.inner(), want))
+                },
+                move |r| {
+                    match r {
+                        Ok(()) => status.set_label(""),
+                        Err(e) => status.set_label(&format!("Could not change Wi-Fi: {}", bg::describe(&e))),
+                    }
+                    // Show NetworkManager's actual state either way.
+                    load();
+                },
+            );
+            glib::Propagation::Stop
+        });
+    }
+    load();
+    refresh.connect_clicked(move |_| load());
     root.upcast()
 }
 

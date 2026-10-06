@@ -71,6 +71,18 @@ turns it into a `bootc-generic-iso` with the MadOS image embedded as an
 offline payload. Known upstream issue: `systemd-remount-fs.service` fails on
 Anaconda-installed bootc systems. The qcow2 path is the primary 0.1 artifact.
 
+## Developing the Settings UI without a full system
+
+`mados-api` ships a mock NetworkManager. On any machine with `dbus-daemon`:
+
+```sh
+addr=$(dbus-daemon --session --print-address=1 --fork)
+DBUS_SYSTEM_BUS_ADDRESS=$addr cargo run -p mados-api --example mock-networkmanager &
+DBUS_SYSTEM_BUS_ADDRESS=$addr cargo run -p mados-settings -- --page=network
+```
+
+`MOCK_NM_DENY=1` makes the mock refuse Wi-Fi changes, like polkit would.
+
 ## Host safety
 
 - No script writes to a host block device. VMs write only to files in

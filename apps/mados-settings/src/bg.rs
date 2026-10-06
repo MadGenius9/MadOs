@@ -49,6 +49,24 @@ pub fn describe(e: &zbus::Error) -> String {
             "The system service is not running.".into()
         }
         zbus::Error::InputOutput(_) => "The message bus is not available.".into(),
+        // Upstream services (e.g. NetworkManager) refuse with the standard
+        // AccessDenied error, which zbus may surface as a typed FDO error.
+        other if other.to_string().contains("AccessDenied") => "Not authorized.".into(),
         other => other.to_string(),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn friendly_errors() {
+        let denied = zbus::Error::FDO(Box::new(zbus::fdo::Error::AccessDenied("not authorized".into())));
+        assert_eq!(describe(&denied), "Not authorized.");
+        assert_eq!(
+            describe(&zbus::Error::Failure("boom".into())),
+            zbus::Error::Failure("boom".into()).to_string()
+        );
     }
 }

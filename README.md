@@ -35,6 +35,10 @@ KDE Plasma (Fedora Kinoite) as a temporary bootstrap, and this README says so.
   "Turn Bluetooth on" asks for confirmation; "sudo rm -rf /" is refused.
 - `org.mados.System1` refuses power actions for unauthorized callers and
   checks polkit against the caller (tested with mocks on a private bus).
+- Settings → Network & Wi-Fi against a mock NetworkManager on a private bus:
+  shows state, devices, connection and IPv4 address; the Wi-Fi switch changes
+  the radio, and a refusal leaves the switch showing the real state with
+  "Not authorized." (verified headless; real NetworkManager unverified).
 
 ### Implemented but unverified
 
@@ -49,7 +53,7 @@ untested.
 
 Installer polish and first-run, installing updates from Settings, automatic
 rollback, signed images, most Settings categories (they say so and open the
-KDE module instead), assistant model providers, MadOS shell, file manager,
+KDE module instead), choosing a Wi-Fi network in MadOS Settings, assistant model providers, MadOS shell, file manager,
 terminal (Dolphin and Konsole are used).
 
 ## Build

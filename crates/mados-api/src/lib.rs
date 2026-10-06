@@ -15,6 +15,8 @@
 use serde::{Deserialize, Serialize};
 use zbus::proxy;
 
+pub mod network;
+
 pub use mados_core::names;
 
 /// Client proxy for `org.mados.System1`.
