@@ -1,0 +1,42 @@
+# MadOS product metadata — THE single source of truth.
+#
+# Every user-visible product string, the version, vendor, URLs, logo and accent
+# colour come from this file. Do not hard-code these values elsewhere:
+#   - Rust:   mados_core::product (embeds this file at compile time, and reads
+#             /usr/lib/mados/product.toml at runtime when installed)
+#   - Shell:  python3 scripts/product.py get <key>
+#   - Image:  copied to /usr/lib/mados/product.toml; os-release, desktop files
+#             and KDE defaults are generated from it at image build time.
+#
+# "MadOS" is a WORKING CODENAME. Rebranding = editing this file + product/assets.
+
+schema = 1
+
+[product]
+name = "MadOS"                   # short product name shown in UI
+full_name = "MadOS"              # long form, e.g. for About
+id = "mados"                     # lowercase technical id (os-release VARIANT_ID)
+tagline = "Development build"
+
+[version]
+major = 0
+minor = 1
+patch = 0
+pre = "dev"                      # "" for a release; full version = 0.1.0-dev
+codename = ""
+
+[vendor]
+name = "MadOS Project"
+url = "https://github.com/MadGenius9/MadOs"
+
+[urls]
+home = "https://github.com/MadGenius9/MadOs"
+bugs = "https://github.com/MadGenius9/MadOs/issues"
+docs = "https://github.com/MadGenius9/MadOs/tree/master/docs"
+
+[branding]
+# Paths are relative to product/
+logo = "assets/logo.svg"
+wallpaper = "assets/wallpaper.svg"
+accent = "#7c5cff"               # primary accent colour (hex RGB)
+accent_secondary = "#22d3ee"
