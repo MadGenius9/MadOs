@@ -1,0 +1,14 @@
+[package]
+name = "mados-api"
+description = "MadOS system API: D-Bus interface contracts, client proxies and wire types"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[dependencies]
+mados-core.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+zbus.workspace = true

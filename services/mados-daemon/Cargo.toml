@@ -1,0 +1,18 @@
+[package]
+name = "mados-daemon"
+description = "MadOS system service (org.mados.System1 on the system bus)"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[dependencies]
+mados-core.workspace = true
+mados-api.workspace = true
+serde_json.workspace = true
+zbus.workspace = true
+blocking.workspace = true
+
+[dev-dependencies]
+async-channel.workspace = true

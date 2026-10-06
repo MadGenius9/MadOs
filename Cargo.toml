@@ -1,0 +1,38 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/mados-core",
+    "crates/mados-api",
+    "services/mados-daemon",
+    "services/mados-ai",
+    "apps/madosctl",
+    "apps/mados-settings",
+]
+
+# Crate versions are Rust package versions, NOT the product version.
+# The product version lives only in product/product.toml.
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0"
+rust-version = "1.80"
+publish = false
+
+[workspace.dependencies]
+mados-core = { path = "crates/mados-core" }
+mados-api = { path = "crates/mados-api" }
+mados-ai = { path = "services/mados-ai" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+toml = "0.8"
+thiserror = "2"
+libc = "0.2"
+zbus = { version = "5", default-features = false, features = ["async-io", "blocking-api"] }
+blocking = "1"
+async-channel = "2"
+gtk = { package = "gtk4", version = "0.10" }
+tempfile = "3"
+
+[profile.release]
+lto = "thin"
+strip = "debuginfo"

@@ -1,0 +1,16 @@
+[package]
+name = "mados-settings"
+description = "MadOS Settings (GTK 4)"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[dependencies]
+mados-core.workspace = true
+mados-api.workspace = true
+serde_json.workspace = true
+zbus.workspace = true
+async-channel.workspace = true
+gtk = { workspace = true, features = ["v4_12"] }
