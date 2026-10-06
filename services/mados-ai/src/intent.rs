@@ -25,6 +25,12 @@ pub enum Intent {
     SetBrightness {
         percent: u8,
     },
+    SetVolume {
+        percent: u8,
+    },
+    SetMuted {
+        muted: bool,
+    },
     CheckUpdates,
     InstallUpdate,
     ConnectDevice {
@@ -77,6 +83,7 @@ impl Intent {
         };
         match self {
             Intent::SetBrightness { percent } if *percent > 100 => Err("brightness must be 0-100".into()),
+            Intent::SetVolume { percent } if *percent > 100 => Err("volume must be 0-100".into()),
             Intent::ConnectDevice { name } | Intent::OpenApp { name } | Intent::InstallApp { name } => {
                 check(name, "name")
             }

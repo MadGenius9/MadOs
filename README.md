@@ -50,6 +50,10 @@ KDE Plasma (Fedora Kinoite) as a temporary bootstrap, and this README says so.
   one at a time, completion signal) tested on a private bus and against a
   fake `bootc` executable; Settings → Updates driven end to end against the
   real service code with a simulated bootc (real bootc system unverified).
+- Sound: `mados-audio` reads outputs and changes volume/mute on a real
+  PulseAudio server in tests (cross-checked with `pactl`); Settings → Sound
+  driven headless against that server. On MadOS the server is PipeWire's
+  PulseAudio-compatible service (unverified in the VM yet).
 - Display brightness through logind `SetBrightness` against a mock logind;
   Settings → Display shows connectors/preferred modes from sysfs and hides
   the brightness slider when there is no backlight (real hardware unverified).

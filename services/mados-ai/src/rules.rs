@@ -97,6 +97,27 @@ pub fn parse(input: &str) -> Option<Intent> {
     ) {
         return Some(Intent::Reboot);
     }
+    // Sound before the radios: "mute" / "turn the sound off" are not Wi-Fi.
+    let words: Vec<&str> = t
+        .split(|c: char| !c.is_alphanumeric())
+        .filter(|w| !w.is_empty())
+        .collect();
+    if words.contains(&"unmute") {
+        return Some(Intent::SetMuted { muted: false });
+    }
+    if words.contains(&"mute") || has_any(t, &["sound off", "silence the"]) {
+        return Some(Intent::SetMuted { muted: true });
+    }
+    if t.contains("volume") || t.contains("louder") || t.contains("quieter") {
+        if let Some(n) = first_number(t) {
+            return Some(Intent::SetVolume {
+                percent: n.min(100) as u8,
+            });
+        }
+        if has_any(t, &["max", "full"]) {
+            return Some(Intent::SetVolume { percent: 100 });
+        }
+    }
     if t.contains("bluetooth") {
         if let Some(enabled) = on_off(t) {
             return Some(Intent::SetBluetooth { enabled });
@@ -269,6 +290,21 @@ mod tests {
             p("run the command shutdown now"),
             Some(Intent::RunCommand { .. })
         ));
+    }
+
+    #[test]
+    fn sound() {
+        assert_eq!(p("Set the volume to 30%"), Some(Intent::SetVolume { percent: 30 }));
+        assert_eq!(p("volume 250"), Some(Intent::SetVolume { percent: 100 }));
+        assert_eq!(p("Mute"), Some(Intent::SetMuted { muted: true }));
+        assert_eq!(p("unmute please"), Some(Intent::SetMuted { muted: false }));
+        assert_eq!(p("turn the sound off"), Some(Intent::SetMuted { muted: true }));
+        assert_eq!(
+            p("turn off wifi"),
+            Some(Intent::SetWifi { enabled: false }),
+            "radios unaffected"
+        );
+        assert_eq!(p("what's the volume like"), None, "no number, no change");
     }
 
     #[test]

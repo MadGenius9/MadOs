@@ -50,6 +50,9 @@ pub fn confirmation_prompt(intent: &Intent) -> String {
         Intent::SetWifi { enabled } => format!("Turn Wi-Fi {}?", if *enabled { "on" } else { "off" }),
         Intent::SetBluetooth { enabled } => format!("Turn Bluetooth {}?", if *enabled { "on" } else { "off" }),
         Intent::SetBrightness { percent } => format!("Set display brightness to {percent}%?"),
+        Intent::SetVolume { percent } => format!("Set the volume to {percent}%?"),
+        Intent::SetMuted { muted: true } => "Mute the sound?".into(),
+        Intent::SetMuted { muted: false } => "Unmute the sound?".into(),
         Intent::InstallUpdate => {
             "Download and install the system update? It takes effect after a restart; the current version is kept for rollback.".into()
         }
@@ -183,6 +186,8 @@ impl<O: SystemOps> Assistant<O> {
             Intent::SetWifi { enabled } => self.ops.set_wifi(*enabled).await,
             Intent::SetBluetooth { enabled } => self.ops.set_bluetooth(*enabled).await,
             Intent::SetBrightness { percent } => self.ops.set_brightness(*percent).await,
+            Intent::SetVolume { percent } => self.ops.set_volume(*percent).await,
+            Intent::SetMuted { muted } => self.ops.set_muted(*muted).await,
             Intent::CheckUpdates => self.ops.check_updates().await,
             Intent::InstallUpdate => self.ops.install_update().await,
             // Policy never routes these here; fail closed if it ever does.
@@ -237,6 +242,12 @@ mod tests {
         }
         fn check_updates(&self) -> BoxFuture<'_, OpResult> {
             self.log("check-updates")
+        }
+        fn set_volume(&self, _: u8) -> BoxFuture<'_, OpResult> {
+            self.log("volume")
+        }
+        fn set_muted(&self, _: bool) -> BoxFuture<'_, OpResult> {
+            self.log("mute")
         }
         fn install_update(&self) -> BoxFuture<'_, OpResult> {
             self.log("install-update")

@@ -14,7 +14,7 @@ FROM ${BUILDER_IMAGE}:${FEDORA_VERSION} AS builder
 
 RUN dnf -y install --setopt=install_weak_deps=False \
         cargo rust gcc pkgconf-pkg-config \
-        gtk4-devel dbus-devel \
+        gtk4-devel dbus-devel pulseaudio-libs-devel \
         python3 librsvg2-tools \
     && dnf clean all
 

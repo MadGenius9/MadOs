@@ -48,6 +48,8 @@ pub fn capability(intent: &Intent) -> Capability {
         Intent::SetWifi { .. } => ("network.wifi.set", Settings, true),
         Intent::SetBluetooth { .. } => ("bluetooth.set", Settings, true),
         Intent::SetBrightness { .. } => ("display.brightness.set", Settings, true),
+        Intent::SetVolume { .. } => ("sound.volume.set", Settings, true),
+        Intent::SetMuted { .. } => ("sound.mute.set", Settings, true),
         // Fetches metadata only; authorized by polkit updates.check.
         Intent::CheckUpdates => ("updates.check", ReadOnly, true),
         // Admin authentication again in mados-daemon (polkit updates.apply).
@@ -96,6 +98,8 @@ mod tests {
             Intent::SetWifi { enabled: true },
             Intent::SetBluetooth { enabled: true },
             Intent::SetBrightness { percent: 50 },
+            Intent::SetVolume { percent: 10 },
+            Intent::SetMuted { muted: true },
             Intent::CheckUpdates,
             Intent::InstallUpdate,
             Intent::ConnectDevice { name: "x".into() },

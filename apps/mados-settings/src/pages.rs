@@ -1091,6 +1091,181 @@ pub fn display() -> gtk::Widget {
     root.upcast()
 }
 
+// ---------------------------------------------------------------- Sound
+
+pub fn sound() -> gtk::Widget {
+    let (root, content) = widgets::page("Sound", None);
+    content.append(
+        &gtk::Label::builder()
+            .label("Output")
+            .xalign(0.0)
+            .css_classes(["heading"])
+            .build(),
+    );
+    let card = gtk::Box::builder()
+        .orientation(gtk::Orientation::Vertical)
+        .spacing(8)
+        .css_classes(["card"])
+        .build();
+    let device = gtk::Label::builder().xalign(0.0).wrap(true).build();
+    card.append(&device);
+    let row = gtk::Box::new(gtk::Orientation::Horizontal, 12);
+    let scale = gtk::Scale::with_range(gtk::Orientation::Horizontal, 0.0, 100.0, 1.0);
+    scale.set_hexpand(true);
+    scale.set_draw_value(true);
+    scale.set_value_pos(gtk::PositionType::Right);
+    row.append(&scale);
+    row.append(&gtk::Label::new(Some("Mute")));
+    let mute = gtk::Switch::builder().valign(gtk::Align::Center).build();
+    row.append(&mute);
+    card.append(&row);
+    content.append(&card);
+
+    content.append(
+        &gtk::Label::builder()
+            .label("Output devices")
+            .xalign(0.0)
+            .css_classes(["heading"])
+            .build(),
+    );
+    let grid = Rc::new(RefCell::new(InfoGrid::new()));
+    content.append(&grid.borrow().grid);
+    let status = widgets::status_label();
+    content.append(&status);
+    content.append(
+        &gtk::Label::builder()
+            .label(format!(
+                "Choosing the output device and input settings are not yet implemented in {} Settings.",
+                product_name()
+            ))
+            .xalign(0.0)
+            .wrap(true)
+            .css_classes(["dim-label"])
+            .build(),
+    );
+    let kde = gtk::Button::builder()
+        .label("Open in KDE System Settings")
+        .halign(gtk::Align::Start)
+        .sensitive(crate::kde_settings_available())
+        .build();
+    kde.connect_clicked(|_| {
+        let _ = std::process::Command::new(crate::KDE_SETTINGS)
+            .arg("kcm_pulseaudio")
+            .spawn();
+    });
+    content.append(&kde);
+
+    let syncing = Rc::new(std::cell::Cell::new(false));
+    let load: Rc<dyn Fn()> = {
+        let (grid, status, device, scale, mute, row, syncing) = (
+            grid.clone(),
+            status.clone(),
+            device.clone(),
+            scale.clone(),
+            mute.clone(),
+            row.clone(),
+            syncing.clone(),
+        );
+        Rc::new(move || {
+            let (grid, status, device, scale, mute, row, syncing) = (
+                grid.clone(),
+                status.clone(),
+                device.clone(),
+                scale.clone(),
+                mute.clone(),
+                row.clone(),
+                syncing.clone(),
+            );
+            bg::run(mados_audio::status, move |r| {
+                let mut g = grid.borrow_mut();
+                g.clear();
+                match r {
+                    Ok(st) => {
+                        match st.default_output() {
+                            Some(o) => {
+                                device.set_label(&o.description);
+                                syncing.set(true);
+                                scale.set_value(f64::from(o.volume_percent.min(100)));
+                                mute.set_active(o.muted);
+                                mute.set_state(o.muted);
+                                syncing.set(false);
+                                row.set_visible(true);
+                            }
+                            None => {
+                                device.set_label("No output device.");
+                                row.set_visible(false);
+                            }
+                        }
+                        for o in &st.outputs {
+                            let mut text = format!("{}%{}", o.volume_percent, if o.muted { " · muted" } else { "" });
+                            if o.is_default {
+                                text.push_str(" · default");
+                            }
+                            g.row(&o.description, &text);
+                        }
+                        status.set_label(&format!("Sound server: {}", st.server));
+                    }
+                    Err(e) => {
+                        device.set_label("Sound is unavailable.");
+                        row.set_visible(false);
+                        status.set_label(&e.to_string());
+                    }
+                }
+            });
+        })
+    };
+
+    {
+        let (status, syncing) = (status.clone(), syncing.clone());
+        let pending: Rc<RefCell<Option<glib::SourceId>>> = Rc::default();
+        scale.connect_value_changed(move |sc| {
+            if syncing.get() {
+                return;
+            }
+            if let Some(id) = pending.borrow_mut().take() {
+                id.remove();
+            }
+            let percent = sc.value().round().clamp(0.0, 100.0) as u32;
+            let (status, pending_inner) = (status.clone(), pending.clone());
+            let id = glib::timeout_add_local_once(std::time::Duration::from_millis(150), move || {
+                pending_inner.borrow_mut().take();
+                bg::run(
+                    move || mados_audio::set_volume(percent),
+                    move |r| {
+                        if let Err(e) = r {
+                            status.set_label(&format!("Could not change volume: {e}"));
+                        }
+                    },
+                );
+            });
+            *pending.borrow_mut() = Some(id);
+        });
+    }
+    {
+        let (load, status, syncing) = (load.clone(), status.clone(), syncing.clone());
+        mute.connect_state_set(move |sw, want| {
+            if syncing.get() {
+                return glib::Propagation::Proceed;
+            }
+            sw.set_sensitive(false);
+            let (load, status, sw) = (load.clone(), status.clone(), sw.clone());
+            bg::run(
+                move || mados_audio::set_muted(want),
+                move |r| {
+                    if let Err(e) = r {
+                        status.set_label(&format!("Could not change mute: {e}"));
+                    }
+                    sw.set_sensitive(true);
+                    load();
+                },
+            );
+            glib::Propagation::Stop
+        });
+    }
+    load();
+    root.upcast()
+}
+
 fn assistant_call(
     f: impl FnOnce(&AssistantProxyBlocking<'static>) -> zbus::Result<String>,
 ) -> zbus::Result<AssistantReply> {

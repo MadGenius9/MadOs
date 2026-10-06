@@ -52,6 +52,7 @@ system APIs over D-Bus: org.mados.System1 (polkit), NetworkManager, BlueZ, login
 | network.wifi.set | SetWifi | settings | NetworkManager `WirelessEnabled` |
 | bluetooth.set | SetBluetooth | settings | BlueZ `Adapter1.Powered` |
 | display.brightness.set | SetBrightness | settings | logind `Session.SetBrightness` |
+| sound.volume.set / sound.mute.set | SetVolume / SetMuted | settings | `mados-audio` (user's sound server) |
 | updates.check | CheckUpdates | read-only | org.mados.System1 `CheckForUpdate` (polkit updates.check) |
 | updates.install | InstallUpdate | privileged | org.mados.System1 `StartUpdate` (confirmation + polkit admin auth); waits for `UpdateJobFinished` |
 | bluetooth.connect, files.search, apps.open, apps.install | … | — | **not implemented** |

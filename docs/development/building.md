@@ -7,7 +7,7 @@ command for your distribution. It installs nothing.
 
 | Purpose | Needs |
 |---|---|
-| Components (`make build`, `make test`) | Rust (stable), GTK 4 dev files, Python ≥ 3.11, dbus-daemon, shellcheck, rsvg-convert |
+| Components (`make build`, `make test`) | Rust (stable), GTK 4 and libpulse dev files, Python ≥ 3.11, dbus-daemon, pulseaudio (test server), shellcheck, rsvg-convert |
 | Image (`make image`, `make disk`, `make iso`) | podman (run as root via sudo), openssl, ~50 GiB free disk, network access to `quay.io`, Fedora mirrors and `ghcr.io` |
 | VMs (`make vm`, `make smoke`) | qemu-system-x86_64, qemu-img, OVMF (UEFI firmware), ideally `/dev/kvm` access |
 

@@ -47,7 +47,8 @@ jobs:
         run: |
           sudo apt-get update -q
           sudo apt-get install -y -q --no-install-recommends \
-            libgtk-4-dev libdbus-1-dev pkg-config dbus shellcheck \
+            libgtk-4-dev libdbus-1-dev libpulse-dev pkg-config dbus shellcheck \
+            pulseaudio pulseaudio-utils \
             librsvg2-bin desktop-file-utils libxml2-utils \
             qemu-system-x86 qemu-utils ovmf busybox-static cpio file
 

@@ -67,7 +67,7 @@ fn build(app: &gtk::Application) {
     add("network", "Network & Wi-Fi", pages::network());
     add("bluetooth", "Bluetooth", pages::bluetooth());
     add("display", "Display", pages::display());
-    add("sound", "Sound", pages::unavailable("Sound", Some("kcm_pulseaudio")));
+    add("sound", "Sound", pages::sound());
     add("power", "Power", pages::power());
     add("storage", "Storage", pages::storage());
     add("users", "Users", pages::unavailable("Users", Some("kcm_users")));

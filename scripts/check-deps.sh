@@ -24,8 +24,10 @@ hint() {
 echo "Components (make build / make test):"
 if have cargo && have rustc; then ok "Rust $(rustc --version | cut -d' ' -f2)"; else bad "Rust toolchain"; printf '            https://rustup.rs\n'; fi
 if have pkg-config && pkg-config --exists gtk4 2>/dev/null; then ok "GTK 4 development files $(pkg-config --modversion gtk4)"; else bad "GTK 4 development files"; hint gtk4-devel libgtk-4-dev gtk4; fi
+if have pkg-config && pkg-config --exists libpulse 2>/dev/null; then ok "libpulse development files $(pkg-config --modversion libpulse)"; else bad "libpulse development files (sound settings)"; hint pulseaudio-libs-devel libpulse-dev libpulse; fi
 if have python3 && python3 -c 'import sys; sys.exit(sys.version_info < (3, 11))'; then ok "Python $(python3 -c 'import platform; print(platform.python_version())')"; else bad "Python >= 3.11 (tomllib)"; hint python3 python3 python; fi
 if have dbus-daemon; then ok "dbus-daemon (D-Bus integration tests)"; else note "dbus-daemon missing: D-Bus integration tests will be skipped"; hint dbus-daemon dbus dbus; fi
+if have pulseaudio; then ok "pulseaudio (audio integration test server)"; else note "pulseaudio missing: the audio integration test will be skipped"; hint pulseaudio pulseaudio pulseaudio; fi
 if have shellcheck; then ok "shellcheck"; else note "shellcheck missing: shell lint skipped"; hint ShellCheck shellcheck shellcheck; fi
 if have rsvg-convert; then ok "rsvg-convert"; else note "rsvg-convert missing: wallpaper staged as SVG locally"; hint librsvg2-tools librsvg2-bin librsvg; fi
 

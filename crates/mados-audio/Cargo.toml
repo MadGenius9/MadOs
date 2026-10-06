@@ -1,0 +1,17 @@
+[package]
+name = "mados-audio"
+description = "MadOS audio client: output devices, volume and mute via the user's sound server (PipeWire's PulseAudio-compatible API)"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[dependencies]
+mados-core.workspace = true
+serde.workspace = true
+thiserror.workspace = true
+libpulse-binding = "2.30"
+
+[dev-dependencies]
+tempfile.workspace = true

@@ -32,6 +32,8 @@ pub trait SystemOps: Send + Sync {
     fn set_wifi(&self, enabled: bool) -> BoxFuture<'_, OpResult>;
     fn set_bluetooth(&self, enabled: bool) -> BoxFuture<'_, OpResult>;
     fn set_brightness(&self, percent: u8) -> BoxFuture<'_, OpResult>;
+    fn set_volume(&self, percent: u8) -> BoxFuture<'_, OpResult>;
+    fn set_muted(&self, muted: bool) -> BoxFuture<'_, OpResult>;
     fn check_updates(&self) -> BoxFuture<'_, OpResult>;
     fn install_update(&self) -> BoxFuture<'_, OpResult>;
 }
@@ -137,6 +139,24 @@ impl SystemOps for LiveOps {
                 Ok(false) => Err("No adjustable display backlight found (external monitor or VM).".into()),
                 Err(e) => Err(format!("logind refused: {e}")),
             }
+        })
+    }
+
+    fn set_volume(&self, percent: u8) -> BoxFuture<'_, OpResult> {
+        Box::pin(async move {
+            blocking::unblock(move || mados_audio::set_volume(u32::from(percent)))
+                .await
+                .map_err(|e| e.to_string())?;
+            Ok(format!("Volume set to {percent}%."))
+        })
+    }
+
+    fn set_muted(&self, muted: bool) -> BoxFuture<'_, OpResult> {
+        Box::pin(async move {
+            blocking::unblock(move || mados_audio::set_muted(muted))
+                .await
+                .map_err(|e| e.to_string())?;
+            Ok(if muted { "Sound muted." } else { "Sound unmuted." }.into())
         })
     }
 

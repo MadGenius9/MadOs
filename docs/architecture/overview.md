@@ -44,7 +44,7 @@ are **not** presented as MadOS technology.
 | IPC, authorization | D-Bus (dbus-broker), polkit | Fedora | MadOS interfaces and actions |
 | Networking | NetworkManager | Fedora | used by mados-ai (Wi-Fi radio) |
 | Bluetooth | BlueZ | Fedora | used by mados-ai (adapter power) |
-| Audio | PipeWire, WirePlumber | Fedora | none yet |
+| Audio | PipeWire, WirePlumber | Fedora | volume/mute via `mados-audio` (PulseAudio-compatible API) |
 | Desktop session | KDE Plasma 6, KWin, SDDM | Fedora Kinoite | temporary bootstrap; MadOS defaults applied |
 | Terminal | Konsole | KDE | used as-is in 0.1 |
 | File manager | Dolphin | KDE | used as-is in 0.1 |
@@ -57,6 +57,7 @@ are **not** presented as MadOS technology.
 | Component | 0.1 status | Implementation |
 |---|---|---|
 | **mados-core** | implemented | `crates/mados-core`: product metadata, system information, logging, stable names |
+| **mados-audio** | implemented | `crates/mados-audio`: output devices, volume, mute through the user's sound server; separate crate so root services never link audio libraries |
 | **mados-api** | implemented | `crates/mados-api`: D-Bus contracts and client proxies; `network` (NetworkManager), `bluetooth` (BlueZ) and `display` (sysfs + logind) clients; mock NetworkManager/BlueZ examples for UI work |
 | **mados-daemon** (system service; part of *mados-permissions*) | implemented | `services/mados-daemon`: `org.mados.System1`; polkit-checked power actions via logind; bootc status |
 | **mados-permissions** | partial | polkit actions in `system/templates/org.mados.system.policy`, enforced in mados-daemon; assistant policy in `services/mados-ai/src/policy.rs` |
@@ -122,7 +123,7 @@ service's own D-Bus API is used directly, which already enforces polkit):
 |---|---|---|
 | Wi-Fi, networking | NetworkManager D-Bus | **done for status + radio**: `mados_api::network` is the single client used by Settings and mados-ai (NM polkit applies to the user) |
 | Bluetooth | BlueZ D-Bus | **done for status + adapter power**: `mados_api::bluetooth`, shared by Settings and mados-ai |
-| Audio | PipeWire / WirePlumber | session-level API, M4 |
+| Audio | PipeWire (`pipewire-pulse`) | **done for output volume/mute**: `mados-audio` uses PipeWire's PulseAudio-compatible client API (libpulse) as the user; output selection and input later |
 | Displays, brightness | sysfs DRM + logind `SetBrightness` | **done for outputs + brightness**: `mados_api::display`, shared by Settings and mados-ai; modes/arrangement belong to the compositor (KWin), later |
 | Power, reboot, shutdown | **org.mados.System1** → logind | done |
 | Updates | **org.mados.System1** → bootc | **done**: status, check, stage, rollback (progress reporting later) |
@@ -153,7 +154,8 @@ NetworkManager's polkit; selecting networks still delegated to KDE),
 **Bluetooth** (BlueZ adapter state, paired/connected devices, adapter power;
 pairing still delegated to KDE), **Display** (connected outputs and preferred
 modes from sysfs; backlight slider through logind `SetBrightness`; modes and
-arrangement still delegated to KDE),
+arrangement still delegated to KDE), **Sound** (output devices, volume, mute
+via `mados-audio`; device choice and input still delegated to KDE),
 **Storage**, **Power** (restart/shut down through mados-daemon), **Updates**
 (status, check, install, roll back, restart — through mados-daemon),
 **Assistant**. Every other category states that it is not implemented
