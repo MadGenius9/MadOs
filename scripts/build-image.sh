@@ -11,7 +11,7 @@ variant=${MADOS_VARIANT:-dev}
 case $variant in dev|release) ;; *) die "MADOS_VARIANT must be dev or release" ;; esac
 bid=$(build_id)
 base=$(base_ref)
-tag="$IMAGE_NAME:$MADOS_VERSION-$variant"
+tag="$IMAGE_NAME-$variant:$MADOS_VERSION"
 
 python3 "$ROOT/scripts/product.py" validate >/dev/null || die "product/product.toml is invalid"
 announce_sudo
@@ -27,7 +27,7 @@ $PODMAN build \
     --build-arg "PRODUCT_NAME=$MADOS_PRODUCT_NAME" \
     --build-arg "PRODUCT_VERSION=$MADOS_VERSION" \
     --tag "$tag" \
-    --tag "$IMAGE_NAME:latest" \
+    --tag "$IMAGE_NAME-$variant:latest" \
     "$ROOT"
 
 mkdir -p "$OUT"

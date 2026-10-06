@@ -83,12 +83,15 @@ desktop** (see [ADR-002](ADR-002-desktop-bootstrap.md)).
 
 Package-mode and OS identity choices for 0.1:
 
-- `os-release` keeps `ID=fedora` and `ID_LIKE` untouched and sets
-  `NAME`/`PRETTY_NAME`/`VARIANT`/`VARIANT_ID`/`IMAGE_ID`/`IMAGE_VERSION` to
-  MadOS values generated from `product/product.toml`. Changing `ID` breaks
-  tooling that keys off it (image-builder distro detection, Anaconda,
-  `%{fedora}`-adjacent assumptions) and is not worth the risk in 0.1. This is
-  honest: MadOS 0.1 *is* a Fedora derivative.
+- `os-release` keeps the compatibility keys of the base (`ID=fedora`,
+  `VERSION_ID`, `VARIANT_ID`, `PLATFORM_ID`, `CPE_NAME`) and replaces the
+  presentation keys (`NAME`, `PRETTY_NAME`, `IMAGE_ID`, `IMAGE_VERSION`,
+  `BUILD_ID`, URLs, `LOGO`) with values generated from
+  `product/product.toml`; the base `PRETTY_NAME` is kept as
+  `MADOS_BASE_PRETTY_NAME`. Changing `ID`/`VARIANT_ID` breaks tooling that
+  keys off them (image-builder distro detection, Anaconda, Discover's
+  rpm-ostree backend) and is not worth the risk in 0.1. This is honest:
+  MadOS 0.1 *is* a Fedora derivative.
 - SELinux stays enforcing. Nothing in the build disables it.
 
 ## Why

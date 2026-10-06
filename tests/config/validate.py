@@ -221,6 +221,10 @@ def validate_staging(tree: Path) -> None:
             check(True, "")
         except json.JSONDecodeError as e:
             check(False, f"{j.relative_to(tree)}: {e}")
+    env_script = tree / "etc/xdg/plasma-workspace/env/10-mados-xdg.sh"
+    check(env_script.exists(), "Plasma env script not staged")
+    check(not (tree / "etc/xdg/kdeglobals").exists(), "must not overwrite /etc/xdg/kdeglobals (use /usr/share/mados/xdg)")
+    run(["sh", "-n", str(env_script)], "env script syntax")
     variant = info.get("variant")
     autologin = tree / "etc/sddm.conf.d/50-mados-dev-autologin.conf"
     check(autologin.exists() == (variant == "dev"), "SDDM autologin must exist only in dev variant")

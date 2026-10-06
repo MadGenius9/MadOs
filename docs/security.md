@@ -1,0 +1,73 @@
+# MadOS security model
+
+## Principles
+
+1. **Least privilege.** Only `mados-daemon` runs as root, and only because
+   it reads deployment state and calls logind after its own authorization
+   check. `mados-ai` and `mados-settings` run as the user.
+2. **No shell from the UI or the assistant.** Applications call D-Bus
+   methods on the service that owns the state; services run external
+   programs only by absolute path with fixed arguments (today: `bootc status`).
+3. **Authorize the caller, not the service.** `mados-daemon` checks polkit
+   with the *calling* D-Bus peer as subject (`system-bus-name`), so polkit
+   evaluates the user's identity and session. Tested in
+   `services/mados-daemon/tests/dbus_policy.rs`.
+4. **The assistant has no privileges of its own.** See
+   [ADR-003](architecture/ADR-003-mados-ai.md): closed intent set, explicit
+   confirmation for every change, no command execution path.
+5. **Keep platform security on.** SELinux stays enforcing; nothing in the
+   image build disables it. Secure Boot compatibility is preserved by using
+   Fedora's signed shim/GRUB/kernel unchanged.
+6. **No secrets in the repository or image.** No passwords, API keys, tokens
+   or private keys are committed or baked in. `tests/config/validate.py`
+   scans the staged image tree for credential-looking assignments.
+
+## polkit actions
+
+| Action | Default (any / inactive / active) | Used by |
+|---|---|---|
+| `org.mados.system.power` | auth_admin_keep / auth_admin_keep / yes | `PowerOff`, `Reboot` (mirrors logind's own defaults) |
+
+Planned (M7): `org.mados.system.updates.stage`, `…updates.rollback`
+(admin authentication).
+
+## Service hardening
+
+`mados-daemon.service`: `NoNewPrivileges`, `ProtectSystem=full`,
+`ProtectHome`, `PrivateTmp`, `PrivateNetwork`, kernel tunables/modules/logs
+protection, `RestrictAddressFamilies=AF_UNIX`, `MemoryDenyWriteExecute`,
+`SystemCallArchitectures=native`. Its D-Bus policy lets only root own
+`org.mados.System1`.
+
+## Development-only weakenings (prominently documented)
+
+These exist **only in `dev` variant images** (the default for `make image`)
+and are verified absent from `release` builds by `tests/config/validate.py`:
+
+| What | Why | Where |
+|---|---|---|
+| SDDM **autologin** of user `mados` | VM smoke test must reach a graphical session without typing a password | `system/templates/sddm-dev-autologin.conf` |
+| Serial console kernel arguments | boot markers for automated tests | `system/variants/dev/usr/lib/bootc/kargs.d/` |
+| Development user `mados` in `wheel` with a per-build password | log in to VMs | created by `scripts/build-disk.sh` at disk-build time; password is random unless `MADOS_DEV_PASSWORD` is set, stored only in git-ignored `out/dev-credentials.txt` |
+| `qemu-guest-agent` installed | clean reboot/shutdown and network checks from tests | installed in all images; activates only when a virtio guest-agent port exists; Fedora's default config blocks `guest-exec` and file RPCs |
+
+**Installer ISO (experimental):** the installer's *live environment* boots
+with `selinux=0`, following upstream image-builder's documented Anaconda
+setup. It affects only the installer environment, not the installed system,
+which boots with SELinux enforcing. Revisit when the ISO path matures.
+
+**Never use dev images on real hardware or untrusted networks.**
+
+## Long-term requirements
+
+- Signed update images and a signature-enforcing container policy (ADR-004).
+- Secure Boot verified on physical hardware (M8).
+- Measured boot / TPM-bound disk encryption (post-M8).
+- Assistant cloud providers only with explicit opt-in; credentials from the
+  user's keyring.
+
+## Reporting
+
+Report security issues privately to the maintainers (see
+`product/product.toml` → `urls.bugs` for the project location) rather than in
+public issues.
