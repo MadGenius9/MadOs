@@ -8,6 +8,7 @@ members = [
     "services/mados-ai",
     "apps/madosctl",
     "apps/mados-settings",
+    "apps/mados-first-run",
 ]
 
 # Crate versions are Rust package versions, NOT the product version.

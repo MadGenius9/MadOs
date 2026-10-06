@@ -29,7 +29,8 @@ RUN --mount=type=cache,target=/root/.cargo/registry \
     cargo build --release --locked \
     && mkdir -p /out/bin \
     && cp target/release/madosctl target/release/mados-daemon \
-          target/release/mados-ai target/release/mados-settings /out/bin/
+          target/release/mados-ai target/release/mados-settings \
+          target/release/mados-first-run /out/bin/
 
 COPY scripts/stage-system.py scripts/product.py scripts/
 COPY system system

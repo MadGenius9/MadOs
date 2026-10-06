@@ -16,6 +16,8 @@ OSTree) as base + MadOS-owned services and apps on top:
 - `services/mados-ai` — user assistant; text → `Intent` → policy → APIs
 - `apps/mados-settings` — GTK 4 settings app (includes About)
 - `apps/madosctl` — CLI; also emits boot markers for smoke tests
+- `apps/mados-first-run` — welcome window shown once per user at first login
+- `crates/mados-audio` — volume/mute via the user's sound server (libpulse)
 - `image/` — Containerfile (bootc), `config.env`, `installer/` (ISO)
 - `system/` — files installed into the image (`rootfs/`, `templates/`, `variants/dev/`)
 - `scripts/` — build tooling; `tests/config`, `tests/smoke` — validation and VM tests

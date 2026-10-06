@@ -32,6 +32,7 @@ BINARIES = {
     # name in bin-dir -> install path
     "madosctl": "usr/bin/madosctl",
     "mados-settings": "usr/bin/mados-settings",
+    "mados-first-run": "usr/bin/mados-first-run",
     "mados-ai": "usr/libexec/mados/mados-ai",
     "mados-daemon": "usr/libexec/mados/mados-daemon",
 }
@@ -182,6 +183,32 @@ Exec=mados-settings --page=about
 Icon={pid}-logo
 Categories=System;
 StartupNotify=true
+""",
+    )
+
+    # First-run welcome: once per user at login (XDG autostart), and from the menu.
+    write(
+        dest,
+        "etc/xdg/autostart/org.mados.FirstRun.desktop",
+        f"""[Desktop Entry]
+Type=Application
+Name=Welcome to {name}
+Exec=mados-first-run --autostart
+Icon={pid}-logo
+NoDisplay=true
+X-KDE-autostart-phase=2
+""",
+    )
+    write(
+        dest,
+        "usr/share/applications/org.mados.FirstRun.desktop",
+        f"""[Desktop Entry]
+Type=Application
+Name=Welcome to {name}
+Comment=Introduction to {name}
+Exec=mados-first-run
+Icon={pid}-logo
+Categories=System;
 """,
     )
 

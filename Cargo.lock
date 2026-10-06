@@ -792,6 +792,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "mados-first-run"
+version = "0.1.0"
+dependencies = [
+ "gtk4",
+ "mados-api",
+ "mados-core",
+ "tempfile",
+ "zbus",
+]
+
+[[package]]
 name = "mados-settings"
 version = "0.1.0"
 dependencies = [

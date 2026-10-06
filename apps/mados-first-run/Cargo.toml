@@ -1,0 +1,17 @@
+[package]
+name = "mados-first-run"
+description = "MadOS first-run welcome window"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[dependencies]
+mados-core.workspace = true
+mados-api.workspace = true
+zbus.workspace = true
+gtk = { workspace = true, features = ["v4_12"] }
+
+[dev-dependencies]
+tempfile.workspace = true
