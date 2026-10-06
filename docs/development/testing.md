@@ -21,6 +21,7 @@ copy-on-write overlay) and checks:
    `mados-boot-report.service` *after `graphical.target`*.
 2. **units** — `systemctl is-system-running --wait` state and the list of
    failed units carried in the marker; any failed unit fails the test.
+   - **selinux** — the marker's `selinux=` field must be `enforcing`.
 3. **session** — `MADOS_SESSION_OK`: logind reports an active Wayland/X11 user
    session (dev images autologin). `make smoke` requires it.
    - **apps** — `MADOS_APPS`: the dev-only user unit
@@ -46,7 +47,7 @@ Marker format (contract between `apps/madosctl/src/boot_report.rs` and the
 harness):
 
 ```
-MADOS_BOOT_OK version=0.1.0-dev build=<id> kernel=<release> state=running failed=none
+MADOS_BOOT_OK version=0.1.0-dev build=<id> kernel=<release> selinux=enforcing state=running failed=none
 MADOS_SESSION_OK type=wayland class=user desktop=KDE
 MADOS_SESSION_NONE reason=timeout
 MADOS_APPS terminal=ok files=ok browser=ok settings=ok audio=ok

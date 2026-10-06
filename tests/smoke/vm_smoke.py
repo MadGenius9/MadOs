@@ -6,6 +6,7 @@ Boots an image in QEMU (UEFI) and checks, in order:
   1. boot       MADOS_BOOT_OK marker on the serial console (written by
                 mados-boot-report.service after graphical.target)
   2. units      no failed systemd units (from the marker's failed= field)
+     selinux    SELinux is enforcing (from the marker's selinux= field)
   3. session    MADOS_SESSION_OK: an active Wayland/X11 user session
      apps       MADOS_APPS (dev images): terminal, file manager, browser and
                 settings each started and claimed their D-Bus name
@@ -143,6 +144,11 @@ def run(ns: argparse.Namespace) -> int:
         failed_units = boot.get("failed", "unknown")
         report.add("units", "pass" if failed_units == "none" else "fail",
                    f"state={boot.get('state')} failed={failed_units}")
+        selinux = boot.get("selinux")
+        if selinux is None:
+            report.add("selinux", "skip", "marker has no selinux field (older image)")
+        else:
+            report.add("selinux", "pass" if selinux == "enforcing" else "fail", f"selinux={selinux}")
         boot_end = m.end()
 
         # 3. graphical session

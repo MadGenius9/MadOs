@@ -4,7 +4,7 @@
 //! single-line machine-readable markers to stdout, which the unit routes to
 //! the journal and the console (the serial port in test VMs):
 //!
-//!   MADOS_BOOT_OK version=… build=… state=running|degraded failed=…
+//!   MADOS_BOOT_OK version=… build=… kernel=… selinux=enforcing|permissive|disabled state=running|degraded failed=…
 //!   MADOS_SESSION_OK type=wayland class=user desktop=…   (or MADOS_SESSION_NONE)
 //!   MADOS_APPS terminal=ok files=ok browser=ok settings=ok audio=ok
 //!                                                        (dev images only; relayed
@@ -55,8 +55,9 @@ pub fn run(args: &[&str]) -> i32 {
         })
         .unwrap_or_default();
     let kernel = std::fs::read_to_string("/proc/sys/kernel/osrelease").unwrap_or_default();
+    let selinux = selinux_mode(std::fs::read_to_string("/sys/fs/selinux/enforce").ok().as_deref());
     println!(
-        "MADOS_BOOT_OK version={} build={build} kernel={} state={state} failed={}",
+        "MADOS_BOOT_OK version={} build={build} kernel={} selinux={selinux} state={state} failed={}",
         product.version.full(),
         kernel.trim(),
         if failed.is_empty() { "none" } else { &failed }
@@ -83,6 +84,17 @@ pub fn run(args: &[&str]) -> i32 {
                 return 0;
             }
         }
+    }
+}
+
+/// SELinux mode from the contents of /sys/fs/selinux/enforce (absent when
+/// SELinux is disabled).
+pub fn selinux_mode(enforce: Option<&str>) -> &'static str {
+    match enforce.map(str::trim) {
+        Some("1") => "enforcing",
+        Some("0") => "permissive",
+        Some(_) => "unknown",
+        None => "disabled",
     }
 }
 
@@ -147,4 +159,14 @@ fn graphical_session() -> zbus::Result<Option<(String, u32)>> {
         }
         Ok(None)
     })
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn selinux_modes() {
+        assert_eq!(super::selinux_mode(Some("1\n")), "enforcing");
+        assert_eq!(super::selinux_mode(Some("0")), "permissive");
+        assert_eq!(super::selinux_mode(None), "disabled");
+    }
 }
