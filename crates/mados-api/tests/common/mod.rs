@@ -2,4 +2,5 @@
 #![allow(dead_code)]
 
 pub mod mock_bluez;
+pub mod mock_logind;
 pub mod mock_nm;

@@ -13,7 +13,6 @@ use std::collections::HashMap;
 use std::future::Future;
 use std::path::{Path, PathBuf};
 use std::pin::Pin;
-use zbus::zvariant::OwnedObjectPath;
 use zbus::Connection;
 
 pub type BoxFuture<'a, T> = Pin<Box<dyn Future<Output = T> + Send + 'a>>;
@@ -130,39 +129,12 @@ impl SystemOps for LiveOps {
     }
 
     fn set_brightness(&self, percent: u8) -> BoxFuture<'_, OpResult> {
-        let root = self.root.clone();
         Box::pin(async move {
-            let (name, max) = blocking::unblock(move || first_backlight(&root))
-                .await
-                .ok_or("No adjustable display backlight found (external monitor or VM).")?;
-            let value = (u64::from(percent.min(100)) * u64::from(max) / 100) as u32;
-            let bus = self.bus()?;
-            // The user's graphical session, resolved by logind for this uid.
-            let user = zbus::Proxy::new(
-                bus,
-                "org.freedesktop.login1",
-                "/org/freedesktop/login1/user/self",
-                "org.freedesktop.login1.User",
-            )
-            .await
-            .map_err(|e| e.to_string())?;
-            let (_id, session_path): (String, OwnedObjectPath) = user
-                .get_property("Display")
-                .await
-                .map_err(|e| format!("no graphical session: {e}"))?;
-            let session = zbus::Proxy::new(
-                bus,
-                "org.freedesktop.login1",
-                session_path,
-                "org.freedesktop.login1.Session",
-            )
-            .await
-            .map_err(|e| e.to_string())?;
-            session
-                .call_method("SetBrightness", &("backlight", name.as_str(), value))
-                .await
-                .map_err(|e| format!("logind refused: {e}"))?;
-            Ok(format!("Brightness set to {percent}%."))
+            match mados_api::display::set_brightness(self.bus()?, &self.root, percent).await {
+                Ok(true) => Ok(format!("Brightness set to {percent}%.")),
+                Ok(false) => Err("No adjustable display backlight found (external monitor or VM).".into()),
+                Err(e) => Err(format!("logind refused: {e}")),
+            }
         })
     }
 }
@@ -305,21 +277,6 @@ fn top_memory_processes(root: &Path, n: usize) -> Vec<(String, u64)> {
     procs
 }
 
-fn first_backlight(root: &Path) -> Option<(String, u32)> {
-    let mut names: Vec<String> = std::fs::read_dir(root.join("sys/class/backlight"))
-        .ok()?
-        .filter_map(|e| e.ok())
-        .map(|e| e.file_name().to_string_lossy().into_owned())
-        .collect();
-    names.sort();
-    names.into_iter().find_map(|n| {
-        let max: u32 = read(root, &format!("sys/class/backlight/{n}/max_brightness"))?
-            .parse()
-            .ok()?;
-        (max > 0).then_some((n, max))
-    })
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -358,17 +315,5 @@ mod tests {
         assert!(r.contains("CPU is overloaded"), "{r}");
         assert!(r.contains("Memory is nearly full"), "{r}");
         assert!(r.contains("firefox"), "{r}");
-    }
-
-    #[test]
-    fn backlight_detection() {
-        let d = tempfile::tempdir().unwrap();
-        assert_eq!(first_backlight(d.path()), None);
-        w(
-            d.path(),
-            "sys/class/backlight/intel_backlight/max_brightness",
-            "96000\n",
-        );
-        assert_eq!(first_backlight(d.path()), Some(("intel_backlight".into(), 96000)));
     }
 }

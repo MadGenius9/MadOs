@@ -16,6 +16,7 @@ use serde::{Deserialize, Serialize};
 use zbus::proxy;
 
 pub mod bluetooth;
+pub mod display;
 pub mod network;
 
 pub use mados_core::names;

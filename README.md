@@ -41,6 +41,9 @@ KDE Plasma (Fedora Kinoite) as a temporary bootstrap, and this README says so.
   "Not authorized." (verified headless; real NetworkManager unverified).
 - Settings → Bluetooth against a mock BlueZ: adapter, paired/connected
   devices, adapter power switch (verified headless; real BlueZ unverified).
+- Display brightness through logind `SetBrightness` against a mock logind;
+  Settings → Display shows connectors/preferred modes from sysfs and hides
+  the brightness slider when there is no backlight (real hardware unverified).
 
 ### Implemented but unverified
 

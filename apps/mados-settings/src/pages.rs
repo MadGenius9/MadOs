@@ -793,6 +793,141 @@ pub fn bluetooth() -> gtk::Widget {
     root.upcast()
 }
 
+// ---------------------------------------------------------------- Display
+
+pub fn display() -> gtk::Widget {
+    let (root, content) = widgets::page("Display", None);
+    let root_fs = std::path::PathBuf::from("/");
+
+    content.append(
+        &gtk::Label::builder()
+            .label("Brightness")
+            .xalign(0.0)
+            .css_classes(["heading"])
+            .build(),
+    );
+    let card = gtk::Box::builder()
+        .orientation(gtk::Orientation::Vertical)
+        .spacing(6)
+        .css_classes(["card"])
+        .build();
+    let scale = gtk::Scale::with_range(gtk::Orientation::Horizontal, 1.0, 100.0, 1.0);
+    scale.set_hexpand(true);
+    scale.set_draw_value(true);
+    scale.set_value_pos(gtk::PositionType::Right);
+    let note = gtk::Label::builder()
+        .xalign(0.0)
+        .wrap(true)
+        .css_classes(["dim-label"])
+        .build();
+    card.append(&scale);
+    card.append(&note);
+    content.append(&card);
+
+    content.append(
+        &gtk::Label::builder()
+            .label("Outputs")
+            .xalign(0.0)
+            .css_classes(["heading"])
+            .build(),
+    );
+    let grid = Rc::new(RefCell::new(InfoGrid::new()));
+    content.append(&grid.borrow().grid);
+    let status = widgets::status_label();
+    content.append(&status);
+    content.append(
+        &gtk::Label::builder()
+            .label(format!(
+                "Resolution, scaling and arrangement are not yet implemented in {} Settings.",
+                product_name()
+            ))
+            .xalign(0.0)
+            .wrap(true)
+            .css_classes(["dim-label"])
+            .build(),
+    );
+    let kde = gtk::Button::builder()
+        .label("Open in KDE System Settings")
+        .halign(gtk::Align::Start)
+        .sensitive(crate::kde_settings_available())
+        .build();
+    kde.connect_clicked(|_| {
+        let _ = std::process::Command::new(crate::KDE_SETTINGS)
+            .arg("kcm_kscreen")
+            .spawn();
+    });
+    content.append(&kde);
+
+    // Set while the slider shows the value read from sysfs, so that is not
+    // sent back as a brightness request.
+    let syncing = Rc::new(std::cell::Cell::new(false));
+
+    // Outputs and current brightness (sysfs reads, unprivileged).
+    {
+        let (grid, scale, note, syncing) = (grid.clone(), scale.clone(), note.clone(), syncing.clone());
+        let r = root_fs.clone();
+        bg::run(
+            move || (mados_api::display::outputs(&r), mados_api::display::backlight(&r)),
+            move |(outs, bl)| {
+                let mut g = grid.borrow_mut();
+                if outs.is_empty() {
+                    g.row("Outputs", "No display connectors found");
+                }
+                for o in &outs {
+                    let state = match (o.connected, &o.preferred_mode) {
+                        (true, Some(m)) => format!("Connected · preferred mode {m}"),
+                        (true, None) => "Connected".to_string(),
+                        (false, _) => "Disconnected".to_string(),
+                    };
+                    g.row(&o.name, &state);
+                }
+                match bl {
+                    Some(b) => {
+                        syncing.set(true);
+                        scale.set_value(f64::from(b.percent().max(1)));
+                        syncing.set(false);
+                        note.set_label(&format!("Built-in display backlight ({})", b.name));
+                    }
+                    None => {
+                        // No fake value: there is nothing to adjust.
+                        scale.set_visible(false);
+                        note.set_label("No adjustable built-in display (external monitor or virtual machine).");
+                    }
+                }
+            },
+        );
+    }
+
+    // Apply slider changes through logind, debounced so dragging sends a
+    // request only after the value settles.
+    let pending: Rc<RefCell<Option<glib::SourceId>>> = Rc::default();
+    scale.connect_value_changed(move |sc| {
+        if syncing.get() {
+            return;
+        }
+        if let Some(id) = pending.borrow_mut().take() {
+            id.remove();
+        }
+        let percent = sc.value().round().clamp(1.0, 100.0) as u8;
+        let (status, pending_inner, r) = (status.clone(), pending.clone(), root_fs.clone());
+        let id = glib::timeout_add_local_once(std::time::Duration::from_millis(250), move || {
+            pending_inner.borrow_mut().take();
+            bg::run(
+                move || -> zbus::Result<bool> {
+                    let conn = bg::system_bus()?;
+                    zbus::block_on(mados_api::display::set_brightness(conn.inner(), &r, percent))
+                },
+                move |res| match res {
+                    Ok(_) => status.set_label(""),
+                    Err(e) => status.set_label(&format!("Could not change brightness: {}", bg::describe(&e))),
+                },
+            );
+        });
+        *pending.borrow_mut() = Some(id);
+    });
+    root.upcast()
+}
+
 fn assistant_call(
     f: impl FnOnce(&AssistantProxyBlocking<'static>) -> zbus::Result<String>,
 ) -> zbus::Result<AssistantReply> {
