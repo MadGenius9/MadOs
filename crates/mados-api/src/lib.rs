@@ -35,6 +35,29 @@ pub trait System {
     /// JSON-encoded [`UpdateStatus`].
     fn get_update_status(&self) -> zbus::Result<String>;
 
+    /// Asks the update source whether a newer image exists, then returns the
+    /// JSON [`UpdateStatus`] (`cached_update` set when one is available).
+    /// polkit `org.mados.system.updates.check`.
+    fn check_for_update(&self) -> zbus::Result<String>;
+
+    /// Starts downloading and staging the update as a new deployment for the
+    /// next boot (never reboots). Completion: `UpdateJobFinished("update", …)`.
+    /// polkit `org.mados.system.updates.apply`.
+    fn start_update(&self) -> zbus::Result<()>;
+
+    /// Makes the rollback deployment the default for the next boot.
+    /// Completion: `UpdateJobFinished("rollback", …)`.
+    /// polkit `org.mados.system.updates.apply`.
+    fn start_rollback(&self) -> zbus::Result<()>;
+
+    /// Emitted when a job started by StartUpdate/StartRollback ends.
+    #[zbus(signal)]
+    fn update_job_finished(&self, operation: &str, success: bool, message: &str) -> zbus::Result<()>;
+
+    /// True while an update or rollback job runs.
+    #[zbus(property)]
+    fn busy(&self) -> zbus::Result<bool>;
+
     /// Power off via logind. Requires polkit `org.mados.system.power`.
     fn power_off(&self) -> zbus::Result<()>;
 
@@ -88,6 +111,9 @@ pub struct UpdateStatus {
     pub booted: Option<Deployment>,
     pub staged: Option<Deployment>,
     pub rollback: Option<Deployment>,
+    /// Newer image found by the last update check, if any.
+    #[serde(default)]
+    pub cached_update: Option<Deployment>,
     /// Human-readable reason when `available` is false.
     pub message: Option<String>,
 }

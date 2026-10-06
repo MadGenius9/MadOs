@@ -16,3 +16,5 @@ blocking.workspace = true
 
 [dev-dependencies]
 async-channel.workspace = true
+futures-util.workspace = true
+tempfile.workspace = true

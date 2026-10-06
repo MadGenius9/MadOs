@@ -28,8 +28,8 @@
 |---|---|---|
 | `org.mados.system.power` | auth_admin_keep / auth_admin_keep / yes | `PowerOff`, `Reboot` (mirrors logind's own defaults) |
 
-Planned (M7): `org.mados.system.updates.stage`, `…updates.rollback`
-(admin authentication).
+| `org.mados.system.updates.check` | auth_admin_keep / auth_admin_keep / yes | `CheckForUpdate` (fetches metadata only) |
+| `org.mados.system.updates.apply` | auth_admin / auth_admin / auth_admin_keep | `StartUpdate`, `StartRollback` — validation enforces admin authentication for every case |
 
 ## Service hardening
 

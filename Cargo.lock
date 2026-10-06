@@ -743,9 +743,11 @@ version = "0.1.0"
 dependencies = [
  "async-channel",
  "blocking",
+ "futures-util",
  "mados-api",
  "mados-core",
  "serde_json",
+ "tempfile",
  "zbus",
 ]
 

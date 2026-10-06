@@ -17,4 +17,26 @@
       <allow_active>yes</allow_active>
     </defaults>
   </action>
+
+  <!-- Fetching update metadata changes nothing on the system. -->
+  <action id="org.mados.system.updates.check">
+    <description>Check for operating system updates</description>
+    <message>Authentication is required to check for operating system updates</message>
+    <defaults>
+      <allow_any>auth_admin_keep</allow_any>
+      <allow_inactive>auth_admin_keep</allow_inactive>
+      <allow_active>yes</allow_active>
+    </defaults>
+  </action>
+
+  <!-- Installing or rolling back the OS always needs an administrator. -->
+  <action id="org.mados.system.updates.apply">
+    <description>Install an operating system update or roll back</description>
+    <message>Authentication is required to change the installed operating system</message>
+    <defaults>
+      <allow_any>auth_admin</allow_any>
+      <allow_inactive>auth_admin</allow_inactive>
+      <allow_active>auth_admin_keep</allow_active>
+    </defaults>
+  </action>
 </policyconfig>

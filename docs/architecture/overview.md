@@ -63,7 +63,7 @@ are **not** presented as MadOS technology.
 | **mados-ai** | partial (architecture + rule-based provider) | `services/mados-ai`; see [ADR-003](ADR-003-mados-ai.md) |
 | **mados-settings** | partial | `apps/mados-settings` (GTK 4); see "Settings" below |
 | **mados-about** | implemented | the About page of mados-settings (`mados-settings --page=about`), `madosctl about` |
-| **mados-update** | partial (read-only) | deployment status via mados-daemon; install/rollback via `bootc` CLI; see [ADR-004](ADR-004-updates.md) |
+| **mados-update** | partial | check/install/roll back via mados-daemon + Settings; no published images or automatic rollback yet; see [ADR-004](ADR-004-updates.md) |
 | **mados-session** | partial | Plasma session + MadOS defaults (look-and-feel, accent, wallpaper) from `scripts/stage-system.py`; dev autologin |
 | **mados-shell** | not started | Plasma is the shell until M9; see [ADR-002](ADR-002-desktop-bootstrap.md) |
 | **mados-files** | not started | Dolphin is used |
@@ -102,9 +102,14 @@ or a privileged command.
 | `GetSystemInfo() → s` (JSON `SystemInfo`) | method | none (read-only, non-sensitive) |
 | `GetUpdateStatus() → s` (JSON `UpdateStatus`) | method | none (read-only) |
 | `PowerOff()`, `Reboot()` | method | polkit `org.mados.system.power`, subject = calling bus name |
+| `CheckForUpdate() → s` (JSON `UpdateStatus` incl. `cached_update`) | method | polkit `org.mados.system.updates.check` |
+| `StartUpdate()`, `StartRollback()` | method (background job) | polkit `org.mados.system.updates.apply` (admin) |
+| `UpdateJobFinished(s operation, b success, s message)` | signal | — |
+| `Busy` (b) | property | none |
 | `Version` (s), `ApiLevel` (u) | property | none |
 
-Errors: `org.mados.System1.Error.NotAuthorized`, `org.mados.System1.Error.Failed`.
+Errors: `org.mados.System1.Error.NotAuthorized`, `…Error.Failed`, `…Error.Busy`
+(another update/rollback job is running). `ApiLevel` is 2.
 
 `org.mados.Assistant1` (session bus, `/org/mados/Assistant1`, mados-ai, user):
 `Ask(s) → s`, `Confirm(s) → s`, `Cancel(s)`, property `Provider`. Replies are
@@ -120,7 +125,7 @@ service's own D-Bus API is used directly, which already enforces polkit):
 | Audio | PipeWire / WirePlumber | session-level API, M4 |
 | Displays, brightness | sysfs DRM + logind `SetBrightness` | **done for outputs + brightness**: `mados_api::display`, shared by Settings and mados-ai; modes/arrangement belong to the compositor (KWin), later |
 | Power, reboot, shutdown | **org.mados.System1** → logind | done |
-| Updates | **org.mados.System1** (status) → bootc | install/rollback methods, M7 |
+| Updates | **org.mados.System1** → bootc | **done**: status, check, stage, rollback (progress reporting later) |
 | Storage info | mados-core (unprivileged statvfs) | done |
 | System info | mados-core / org.mados.System1 | done |
 | User session | logind | — |
@@ -150,7 +155,8 @@ pairing still delegated to KDE), **Display** (connected outputs and preferred
 modes from sysfs; backlight slider through logind `SetBrightness`; modes and
 arrangement still delegated to KDE),
 **Storage**, **Power** (restart/shut down through mados-daemon), **Updates**
-(read-only deployment status), **Assistant**. Every other category states that it is not implemented
+(status, check, install, roll back, restart — through mados-daemon),
+**Assistant**. Every other category states that it is not implemented
 and, where KDE has a module, offers "Open in KDE System Settings" (a real,
 working control). No control pretends to change state.
 

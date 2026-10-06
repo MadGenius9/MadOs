@@ -276,11 +276,58 @@ pub fn power() -> gtk::Widget {
 
 // ---------------------------------------------------------------- Updates
 
+/// Deployment status plus whether a job is running.
+type UpdateRead = zbus::Result<(UpdateStatus, bool)>;
+
+fn read_update_status(check: bool) -> UpdateRead {
+    let proxy = SystemProxyBlocking::new(&bg::system_bus()?)?;
+    let json = if check {
+        proxy.check_for_update()?
+    } else {
+        proxy.get_update_status()?
+    };
+    let status = serde_json::from_str(&json).map_err(|e| zbus::Error::Failure(e.to_string()))?;
+    Ok((status, proxy.busy().unwrap_or(false)))
+}
+
+/// Starts an update/rollback job and waits for its UpdateJobFinished signal.
+fn run_update_job(operation: &'static str) -> zbus::Result<(bool, String)> {
+    let conn = bg::system_bus()?;
+    let proxy = SystemProxyBlocking::new(&conn)?;
+    // Subscribe first so the completion signal cannot be missed.
+    let signals = proxy.receive_update_job_finished()?;
+    if operation == "update" {
+        proxy.start_update()?;
+    } else {
+        proxy.start_rollback()?;
+    }
+    for sig in signals {
+        let args = sig.args()?;
+        if *args.operation() == operation {
+            return Ok((*args.success(), args.message().to_string()));
+        }
+    }
+    Err(zbus::Error::Failure("the system service stopped".into()))
+}
+
+fn describe_deployment(d: &mados_api::Deployment) -> String {
+    format!(
+        "{}\n{}{}",
+        d.image.as_deref().unwrap_or("unknown image"),
+        d.version
+            .as_deref()
+            .map(|v| format!("version {v} "))
+            .unwrap_or_default(),
+        d.timestamp.as_deref().unwrap_or("")
+    )
+}
+
 pub fn updates() -> gtk::Widget {
     let (root, content) = widgets::page(
         "Updates",
         Some(&format!(
-            "{} is image-based: updates install as a new deployment and the previous one is kept for rollback.",
+            "{} is image-based: an update installs as a new version next to the running one and takes effect \
+             after a restart. The previous version is kept, so you can roll back.",
             product_name()
         )),
     );
@@ -288,63 +335,179 @@ pub fn updates() -> gtk::Widget {
     content.append(&grid.borrow().grid);
     let status = widgets::status_label();
     content.append(&status);
+
+    let buttons = gtk::Box::new(gtk::Orientation::Horizontal, 8);
+    let check = gtk::Button::with_label("Check for Updates");
+    let install = gtk::Button::builder()
+        .label("Download and Install")
+        .css_classes(["suggested-action"])
+        .build();
+    let rollback = gtk::Button::with_label("Roll Back…");
+    let restart = gtk::Button::builder().label("Restart Now…").visible(false).build();
+    for b in [&check, &install, &rollback, &restart] {
+        b.set_sensitive(false);
+        buttons.append(b);
+    }
+    content.append(&buttons);
     content.append(
         &gtk::Label::builder()
-            .label("Installing updates from Settings is not yet implemented. In this development build, run \u{201c}sudo bootc upgrade\u{201d} in a terminal, then restart. \u{201c}sudo bootc rollback\u{201d} returns to the previous deployment.")
+            .label("Installing or rolling back requires an administrator password. Nothing restarts automatically.")
             .xalign(0.0)
             .wrap(true)
             .css_classes(["dim-label"])
             .build(),
     );
-    let refresh = gtk::Button::builder()
-        .label("Refresh")
-        .halign(gtk::Align::Start)
-        .build();
-    content.append(&refresh);
 
-    let load = move || {
-        let grid = grid.clone();
-        let status = status.clone();
-        status.set_label("Reading deployment status…");
-        bg::run(
-            || -> zbus::Result<UpdateStatus> {
-                let json = SystemProxyBlocking::new(&bg::system_bus()?)?.get_update_status()?;
-                serde_json::from_str(&json).map_err(|e| zbus::Error::Failure(e.to_string()))
-            },
-            move |r| {
-                let mut g = grid.borrow_mut();
-                g.clear();
-                match r {
-                    Ok(s) if s.available => {
-                        status.set_label("");
-                        for (label, d) in [
-                            ("Running", &s.booted),
-                            ("Pending", &s.staged),
-                            ("Rollback", &s.rollback),
-                        ] {
-                            let text = match d {
-                                Some(d) => format!(
-                                    "{}\n{}{}",
-                                    d.image.as_deref().unwrap_or("unknown image"),
-                                    d.version
-                                        .as_deref()
-                                        .map(|v| format!("version {v} "))
-                                        .unwrap_or_default(),
-                                    d.timestamp.as_deref().unwrap_or("")
-                                ),
-                                None => "None".into(),
-                            };
-                            g.row(label, &text);
-                        }
+    // Renders a status read (or check) result and enables what is possible.
+    let render: Rc<dyn Fn(UpdateRead)> = {
+        let (grid, status) = (grid.clone(), status.clone());
+        let (check, install, rollback, restart) = (check.clone(), install.clone(), rollback.clone(), restart.clone());
+        Rc::new(move |r| {
+            let mut g = grid.borrow_mut();
+            g.clear();
+            match r {
+                Ok((s, busy)) if s.available => {
+                    g.row(
+                        "Running",
+                        &s.booted
+                            .as_ref()
+                            .map(describe_deployment)
+                            .unwrap_or_else(|| "Unknown".into()),
+                    );
+                    g.row(
+                        "Installed, pending restart",
+                        &s.staged
+                            .as_ref()
+                            .map(describe_deployment)
+                            .unwrap_or_else(|| "None".into()),
+                    );
+                    g.row(
+                        "Rollback",
+                        &s.rollback
+                            .as_ref()
+                            .map(describe_deployment)
+                            .unwrap_or_else(|| "None".into()),
+                    );
+                    g.row(
+                        "Available update",
+                        &s.cached_update
+                            .as_ref()
+                            .map(describe_deployment)
+                            .unwrap_or_else(|| "None known (check for updates)".into()),
+                    );
+                    if busy {
+                        status.set_label("An update or rollback is in progress…");
                     }
-                    Ok(s) => status.set_label(&format!("Update status unavailable: {}", s.message.unwrap_or_default())),
-                    Err(e) => status.set_label(&format!("Update status unavailable: {}", bg::describe(&e))),
+                    check.set_sensitive(!busy);
+                    install.set_sensitive(!busy && s.cached_update.is_some());
+                    rollback.set_sensitive(!busy && s.rollback.is_some());
+                    restart.set_visible(s.staged.is_some());
+                    restart.set_sensitive(s.staged.is_some());
                 }
-            },
-        );
+                Ok((s, _)) => {
+                    status.set_label(&format!("Updates unavailable: {}", s.message.unwrap_or_default()));
+                    for b in [&check, &install, &rollback] {
+                        b.set_sensitive(false);
+                    }
+                }
+                Err(e) => {
+                    status.set_label(&format!("Updates unavailable: {}", bg::describe(&e)));
+                    for b in [&check, &install, &rollback] {
+                        b.set_sensitive(false);
+                    }
+                }
+            }
+        })
     };
-    load();
-    refresh.connect_clicked(move |_| load());
+    // Reloads (or checks); `notice` is shown once the reload has finished so
+    // it is not overwritten by the reload's own progress text.
+    let load: Rc<dyn Fn(bool, Option<String>)> = {
+        let (render, status) = (render.clone(), status.clone());
+        Rc::new(move |do_check: bool, notice: Option<String>| {
+            status.set_label(if do_check {
+                "Checking for updates…"
+            } else {
+                "Reading update status…"
+            });
+            let (render, status) = (render.clone(), status.clone());
+            bg::run(
+                move || read_update_status(do_check),
+                move |r| {
+                    if r.is_ok() {
+                        status.set_label(notice.as_deref().unwrap_or(""));
+                    }
+                    render(r)
+                },
+            );
+        })
+    };
+    let job = {
+        let (load, status, buttons) = (
+            load.clone(),
+            status.clone(),
+            [check.clone(), install.clone(), rollback.clone()],
+        );
+        move |operation: &'static str| {
+            for b in &buttons {
+                b.set_sensitive(false);
+            }
+            status.set_label(if operation == "update" {
+                "Downloading and installing the update…"
+            } else {
+                "Preparing rollback…"
+            });
+            let load = load.clone();
+            bg::run(
+                move || run_update_job(operation),
+                move |r| match r {
+                    Ok((_, message)) => load(false, Some(message)),
+                    Err(e) => load(false, Some(bg::describe(&e))),
+                },
+            );
+        }
+    };
+    {
+        let load = load.clone();
+        check.connect_clicked(move |_| load(true, None));
+    }
+    {
+        let job = job.clone();
+        install.connect_clicked(move |_| job("update"));
+    }
+    rollback.connect_clicked(move |btn| {
+        let job = job.clone();
+        widgets::confirm(
+            btn,
+            "Roll back to the previous version?",
+            "The previous version becomes active after the next restart.",
+            "Roll Back",
+            move || job("rollback"),
+        );
+    });
+    {
+        let status = status.clone();
+        restart.connect_clicked(move |btn| {
+            let status = status.clone();
+            widgets::confirm(
+                btn,
+                "Restart now?",
+                "Unsaved work in open applications may be lost.",
+                "Restart",
+                move || {
+                    let status = status.clone();
+                    bg::run(
+                        || -> zbus::Result<()> { SystemProxyBlocking::new(&bg::system_bus()?)?.reboot() },
+                        move |r| {
+                            if let Err(e) = r {
+                                status.set_label(&bg::describe(&e));
+                            }
+                        },
+                    );
+                },
+            );
+        });
+    }
+    load(false, None);
     root.upcast()
 }
 

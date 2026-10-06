@@ -192,7 +192,13 @@ def validate_xml(tree: Path, staged: bool) -> None:
         if policy.exists():
             root = ET.parse(policy).getroot()
             ids = {a.get("id") for a in root.findall("action")}
-            check("org.mados.system.power" in ids, "polkit action org.mados.system.power missing")
+            for action in ("org.mados.system.power", "org.mados.system.updates.check", "org.mados.system.updates.apply"):
+                check(action in ids, f"polkit action {action} missing")
+            apply = next((a for a in root.findall("action") if a.get("id") == "org.mados.system.updates.apply"), None)
+            if apply is not None:
+                check(all((apply.findtext(f"defaults/{k}") or "").startswith("auth_admin")
+                          for k in ("allow_any", "allow_inactive", "allow_active")),
+                      "updates.apply must always require admin authentication")
             for a in root.findall("action"):
                 any_ = a.findtext("defaults/allow_any")
                 check(any_ != "yes", f"polkit {a.get('id')}: allow_any must not be yes")

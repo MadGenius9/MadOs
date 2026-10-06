@@ -36,16 +36,19 @@ MadOS uses **bootc (OSTree)** deployments (ADR-001):
 | Capability | Status |
 |---|---|
 | A/B deployments, manual rollback (`sudo bootc rollback`, boot menu) | provided by bootc (upstream) |
-| Deployment status in Settings → Updates and `madosctl update-status` | implemented (read-only, via mados-daemon) |
-| Install update from Settings | not implemented (CLI only) |
+| Deployment status in Settings → Updates and `madosctl update-status` | implemented (via mados-daemon) |
+| Check for updates from Settings (`CheckForUpdate`, bootc `cachedUpdate`) | implemented; polkit `org.mados.system.updates.check` (active user) |
+| Install update from Settings (`StartUpdate` → `bootc upgrade`, staged for next boot, never auto-reboots) | implemented; polkit `org.mados.system.updates.apply` (admin auth); verified against a simulated bootc, unverified on a real bootc system |
+| Roll back from Settings (`StartRollback` → `bootc rollback`) | implemented; same polkit action; same verification status |
 | Automatic rollback when a new deployment fails to boot | not implemented |
 | Signed images / signature policy | not implemented |
 
 ## Plan
 
-- **M7 (update/rollback):** `org.mados.System1` methods `CheckForUpdates`,
-  `StageUpdate`, `Rollback`, each polkit-authorized
-  (`org.mados.system.updates.*`, admin auth); Settings UI; progress signals.
+- **M7 (update/rollback):** done in API level 2 — `CheckForUpdate`,
+  `StartUpdate`, `StartRollback`, `UpdateJobFinished` signal and `Busy`
+  property on `org.mados.System1`; one job at a time; Settings UI. Still
+  missing: download progress reporting and published images to update from.
 - **Automatic rollback:** boot-counting with `greenboot`-style health checks
   — the `mados-boot-report` marker (graphical target reached, no failed
   critical units) is the natural health signal; after N failed boots the

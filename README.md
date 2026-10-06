@@ -41,6 +41,10 @@ KDE Plasma (Fedora Kinoite) as a temporary bootstrap, and this README says so.
   "Not authorized." (verified headless; real NetworkManager unverified).
 - Settings → Bluetooth against a mock BlueZ: adapter, paired/connected
   devices, adapter power switch (verified headless; real BlueZ unverified).
+- Updates: `org.mados.System1` check/install/rollback jobs (polkit-gated,
+  one at a time, completion signal) tested on a private bus and against a
+  fake `bootc` executable; Settings → Updates driven end to end against the
+  real service code with a simulated bootc (real bootc system unverified).
 - Display brightness through logind `SetBrightness` against a mock logind;
   Settings → Display shows connectors/preferred modes from sysfs and hides
   the brightness slider when there is no backlight (real hardware unverified).
@@ -56,8 +60,8 @@ untested.
 
 ### Not implemented yet
 
-Installer polish and first-run, installing updates from Settings, automatic
-rollback, signed images, most Settings categories (they say so and open the
+Installer polish and first-run, automatic rollback, published and signed
+update images (so "Check for Updates" has nothing to find yet), most Settings categories (they say so and open the
 KDE module instead), choosing a Wi-Fi network or pairing Bluetooth devices in MadOS Settings, assistant model providers, MadOS shell, file manager,
 terminal (Dolphin and Konsole are used).
 

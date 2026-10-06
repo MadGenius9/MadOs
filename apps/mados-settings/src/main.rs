@@ -40,6 +40,7 @@ fn css(product: &Product) -> String {
         .dim-label {{ opacity: 0.7; }}
         stacksidebar row:selected {{ background-color: {accent}; color: white; }}
         button.suggested-action {{ background: {accent}; color: white; }}
+        button.suggested-action:disabled {{ opacity: 0.45; }}
         levelbar block.filled {{ background-color: {accent}; }}
         "#,
         accent = product.branding.accent

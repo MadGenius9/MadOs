@@ -22,3 +22,7 @@ pub const ASSISTANT_OBJECT_PATH: &str = "/org/mados/Assistant1";
 
 /// polkit action ids (see system/usr/share/polkit-1/actions/org.mados.system.policy).
 pub const ACTION_POWER: &str = "org.mados.system.power";
+/// Check the update source for a newer image (network fetch of metadata).
+pub const ACTION_UPDATES_CHECK: &str = "org.mados.system.updates.check";
+/// Stage an update or switch to the rollback deployment (admin auth).
+pub const ACTION_UPDATES_APPLY: &str = "org.mados.system.updates.apply";
