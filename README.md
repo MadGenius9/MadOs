@@ -15,7 +15,8 @@ KDE Plasma (Fedora Kinoite) as a temporary bootstrap, and this README says so.
 | Area | Status |
 |---|---|
 | Bootable container image (bootc, Fedora 44 Kinoite base) | **builds in CI** (GitHub Actions job `image`, run #1): components compile against Fedora 44, os-release merge yields `PRETTY_NAME="MadOS 0.1.0-dev"`, boot-report unit enabled, `bootc container lint` passes (13 checks). Cannot be built in the bootstrap dev environment (Fedora servers blocked) |
-| qcow2 disk image via image-builder | run #1 failed (unsupported `customizations.filesystem` for bootc disks); fixed, awaiting the next CI run |
+| qcow2 disk image via image-builder | **builds in CI** (run #2) |
+| **Boots in QEMU/KVM (UEFI)** | **verified in CI run #2**: `MADOS_BOOT_OK` 57 s after power-on (version 0.1.0-dev, Fedora kernel 7.2.8-200.fc44), `graphical.target` reached with **no failed units**, active **Wayland KDE session**, network up (DHCP 10.0.2.15), clean **reboot** to a second successful boot, clean **shutdown** (QEMU exit 0) |
 | Installer ISO (`bootc-generic-iso`) | written; **experimental**, unverified |
 | MadOS components (Rust) | built and tested: 31 unit/integration tests incl. D-Bus policy tests on a real (private) bus |
 | MadOS Settings (GTK 4) | runs; verified headless on Ubuntu (About, Assistant pages rendered with real data) |
@@ -24,6 +25,10 @@ KDE Plasma (Fedora Kinoite) as a temporary bootstrap, and this README says so.
 
 ### What works (verified)
 
+- **The MadOS image builds and boots** (GitHub Actions run #2, QEMU/KVM,
+  UEFI): graphical target with no failed units, Wayland KDE session, network,
+  clean reboot and shutdown — detected by MadOS's own boot markers, not
+  screenshots.
 - `make build`, `make test`: Rust workspace, fmt/clippy clean, unit and D-Bus
   integration tests, 127 static configuration checks, reproducibility check of
   generated files, QEMU harness self-test.
@@ -51,10 +56,11 @@ KDE Plasma (Fedora Kinoite) as a temporary bootstrap, and this README says so.
 
 ### Implemented but unverified
 
-Everything that needs the built Fedora image: booting to the Plasma desktop,
-networking, audio device, Konsole/Dolphin/Firefox, MadOS branding in Plasma,
-polkit/logind/bootc integration on a real system, reboot/shutdown via the
-smoke test, the installer ISO. The Wi-Fi/Bluetooth/brightness assistant
+On the booted image: launching Konsole/Dolphin/Firefox/Settings and audio
+device detection (smoke checks added after run #2; first result in the next
+CI run), MadOS branding in Plasma (screenshot captured but not yet
+reviewed), SELinux mode, mados-daemon/mados-ai against the real
+polkit/logind/NetworkManager/BlueZ/bootc, the installer ISO. The Wi-Fi/Bluetooth/brightness assistant
 actions are implemented against NetworkManager/BlueZ/logind D-Bus APIs but
 untested.
 
@@ -102,7 +108,7 @@ Development images log in automatically as `mados`; the password for
 
 ## Roadmap
 
-M0 repository ✔ · M1 bootable VM image (implemented, awaiting first build) ·
+M0 repository ✔ · M1 bootable VM image ✔ (qcow2; ISO experimental) ·
 M2 branded desktop · M3 system services · M4 Settings · M5 assistant ·
 M6 installer · M7 update/rollback · M8 physical hardware · M9 custom shell ·
 M10 beta. Details: [docs/roadmap.md](docs/roadmap.md).

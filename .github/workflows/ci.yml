@@ -100,7 +100,7 @@ jobs:
         run: |
           sudo apt-get update -q
           sudo apt-get install -y -q --no-install-recommends \
-            podman qemu-system-x86 qemu-utils ovmf openssl
+            podman qemu-system-x86 qemu-utils ovmf openssl imagemagick
 
       - name: Enable KVM
         run: |
@@ -120,6 +120,20 @@ jobs:
 
       - name: Smoke test (boot, session, network, reboot, shutdown)
         run: make smoke
+
+      - name: Smoke highlights (readable from the job log)
+        if: always()
+        run: |
+          if [ -f out/smoke/serial.log ]; then
+            echo "--- boot markers and key console lines"
+            grep -a -E "MADOS_|Welcome to|SELinux|Reached target Graphical|Failed to start" out/smoke/serial.log | cut -c1-200 | head -60 || true
+          fi
+          if [ -f out/smoke/screen.png ] && command -v convert >/dev/null; then
+            convert out/smoke/screen.png -resize 800x -quality 70 out/smoke/thumb.jpg
+            echo "::group::screenshot thumbnail (base64 JPEG)"
+            base64 -w 0 out/smoke/thumb.jpg; echo
+            echo "::endgroup::"
+          fi
 
       - name: Build installer ISO (experimental)
         if: github.event_name == 'workflow_dispatch' && inputs.build_iso

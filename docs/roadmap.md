@@ -6,7 +6,7 @@ this environment allows; awaiting end-to-end verification), **planned**.
 | Milestone | Scope | Status |
 |---|---|---|
 | **M0 — Repository/bootstrap** | monorepo, CLAUDE.md, ADRs, product metadata, Makefile, CI, tests | done |
-| **M1 — Bootable VM image** | bootc Containerfile (Fedora 44 Kinoite base), qcow2 via image-builder, QEMU tooling, smoke test with boot markers, experimental installer ISO | container image **builds and passes `bootc container lint` in CI**; qcow2 conversion and VM boot pending (first disk build hit an unsupported blueprint option, fixed) |
+| **M1 — Bootable VM image** | bootc Containerfile (Fedora 44 Kinoite base), qcow2 via image-builder, QEMU tooling, smoke test with boot markers, experimental installer ISO | **done (qcow2)**: CI run #2 built the image and qcow2 and the smoke test passed under KVM/UEFI — boot in 57 s, no failed units, Wayland KDE session, network, clean reboot and shutdown. Installer ISO still experimental/unverified |
 | **M2 — Branded functional desktop** | MadOS look-and-feel, wallpaper, accent, os-release identity; terminal, files, browser (upstream) | implemented, unverified in a booted image |
 | **M3 — MadOS system services** | `mados-daemon` (`org.mados.System1`): system info, update status, polkit-authorized power | implemented; D-Bus/polkit logic tested on a private bus |
 | **M4 — Mad Settings** | GTK 4 app: About, Network & Wi-Fi (status + radio), Bluetooth (status + adapter power), Display (outputs + brightness), Storage, Power, Updates (read-only), Assistant; other categories honestly marked; next: Wi-Fi network selection, Bluetooth pairing, sound (needs a PipeWire-facing API), display modes | partial |
@@ -19,7 +19,7 @@ this environment allows; awaiting end-to-end verification), **planned**.
 
 ## Next steps (in order)
 
-1. Run CI's `image` job; fix whatever the first real build/boot reveals.
+1. ~~Run CI's `image` job~~ — done; run #2 boots and passes the smoke test.
 2. Pin the base image digest once a known-good build exists.
 3. ~~App-launch smoke checks and audio-device check~~ (implemented; first
    result comes with the first successful VM boot in CI).
