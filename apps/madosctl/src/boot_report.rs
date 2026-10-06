@@ -36,7 +36,9 @@ pub fn run(args: &[&str]) -> i32 {
 
     let product = Product::load();
     let build = BuildInfo::load().map(|b| b.build_id).unwrap_or_else(|| "none".into());
-    let state = systemctl(&["is-system-running"]).unwrap_or_else(|| "unknown".into());
+    // --wait: block until startup finishes (this unit is Type=simple, so it
+    // does not hold up startup itself) to report the final state.
+    let state = systemctl(&["is-system-running", "--wait"]).unwrap_or_else(|| "unknown".into());
     let failed = systemctl(&["list-units", "--failed", "--plain", "--no-legend", "--no-pager"])
         .map(|out| {
             out.lines()
