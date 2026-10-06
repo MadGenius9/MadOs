@@ -50,6 +50,9 @@ pub fn confirmation_prompt(intent: &Intent) -> String {
         Intent::SetWifi { enabled } => format!("Turn Wi-Fi {}?", if *enabled { "on" } else { "off" }),
         Intent::SetBluetooth { enabled } => format!("Turn Bluetooth {}?", if *enabled { "on" } else { "off" }),
         Intent::SetBrightness { percent } => format!("Set display brightness to {percent}%?"),
+        Intent::InstallUpdate => {
+            "Download and install the system update? It takes effect after a restart; the current version is kept for rollback.".into()
+        }
         other => format!("Perform {}?", policy::capability(other).id),
     }
 }
@@ -180,6 +183,8 @@ impl<O: SystemOps> Assistant<O> {
             Intent::SetWifi { enabled } => self.ops.set_wifi(*enabled).await,
             Intent::SetBluetooth { enabled } => self.ops.set_bluetooth(*enabled).await,
             Intent::SetBrightness { percent } => self.ops.set_brightness(*percent).await,
+            Intent::CheckUpdates => self.ops.check_updates().await,
+            Intent::InstallUpdate => self.ops.install_update().await,
             // Policy never routes these here; fail closed if it ever does.
             _ => Err("not executable".into()),
         };
@@ -230,6 +235,12 @@ mod tests {
         fn set_brightness(&self, _: u8) -> BoxFuture<'_, OpResult> {
             self.log("brightness")
         }
+        fn check_updates(&self) -> BoxFuture<'_, OpResult> {
+            self.log("check-updates")
+        }
+        fn install_update(&self) -> BoxFuture<'_, OpResult> {
+            self.log("install-update")
+        }
     }
 
     fn assistant() -> (Assistant<FakeOps>, FakeOps) {
@@ -268,6 +279,20 @@ mod tests {
         let replay = zbus::block_on(a.confirm(":1.1", &id));
         assert_eq!(replay.status, ReplyStatus::Error, "confirmation is single-use");
         assert_eq!(calls(&ops).len(), 1);
+    }
+
+    #[test]
+    fn os_update_needs_confirmation_check_does_not() {
+        let (a, ops) = assistant();
+        assert_eq!(
+            zbus::block_on(a.ask(":1.1", "check for updates")).status,
+            ReplyStatus::Done
+        );
+        let r = zbus::block_on(a.ask(":1.1", "install updates"));
+        assert_eq!(r.status, ReplyStatus::NeedsConfirmation);
+        assert_eq!(calls(&ops), vec!["check-updates"]);
+        zbus::block_on(a.confirm(":1.1", &r.request_id.unwrap()));
+        assert_eq!(calls(&ops), vec!["check-updates", "install-update"]);
     }
 
     #[test]

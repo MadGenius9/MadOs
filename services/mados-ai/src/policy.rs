@@ -48,6 +48,10 @@ pub fn capability(intent: &Intent) -> Capability {
         Intent::SetWifi { .. } => ("network.wifi.set", Settings, true),
         Intent::SetBluetooth { .. } => ("bluetooth.set", Settings, true),
         Intent::SetBrightness { .. } => ("display.brightness.set", Settings, true),
+        // Fetches metadata only; authorized by polkit updates.check.
+        Intent::CheckUpdates => ("updates.check", ReadOnly, true),
+        // Admin authentication again in mados-daemon (polkit updates.apply).
+        Intent::InstallUpdate => ("updates.install", Privileged, true),
         Intent::ConnectDevice { .. } => ("bluetooth.connect", Settings, false),
         Intent::FindFile { .. } => ("files.search", ReadOnly, false),
         Intent::OpenApp { .. } => ("apps.open", Settings, false),
@@ -78,6 +82,7 @@ mod tests {
         assert_eq!(decide(&Intent::SetBluetooth { enabled: true }), Decision::Confirm);
         assert_eq!(decide(&Intent::InstallApp { name: "x".into() }), Decision::Unsupported);
         assert_eq!(decide(&Intent::RunCommand { command: "ls".into() }), Decision::Deny);
+        assert_eq!(decide(&Intent::InstallUpdate), Decision::Confirm);
     }
 
     #[test]
@@ -91,6 +96,8 @@ mod tests {
             Intent::SetWifi { enabled: true },
             Intent::SetBluetooth { enabled: true },
             Intent::SetBrightness { percent: 50 },
+            Intent::CheckUpdates,
+            Intent::InstallUpdate,
             Intent::ConnectDevice { name: "x".into() },
             Intent::FindFile { query: "x".into() },
             Intent::OpenApp { name: "x".into() },

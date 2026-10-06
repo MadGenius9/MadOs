@@ -52,12 +52,15 @@ system APIs over D-Bus: org.mados.System1 (polkit), NetworkManager, BlueZ, login
 | network.wifi.set | SetWifi | settings | NetworkManager `WirelessEnabled` |
 | bluetooth.set | SetBluetooth | settings | BlueZ `Adapter1.Powered` |
 | display.brightness.set | SetBrightness | settings | logind `Session.SetBrightness` |
+| updates.check | CheckUpdates | read-only | org.mados.System1 `CheckForUpdate` (polkit updates.check) |
+| updates.install | InstallUpdate | privileged | org.mados.System1 `StartUpdate` (confirmation + polkit admin auth); waits for `UpdateJobFinished` |
 | bluetooth.connect, files.search, apps.open, apps.install | … | — | **not implemented** |
 | system.command | RunCommand | forbidden | always denied |
 
-The Wi-Fi, Bluetooth and brightness paths are implemented but **unverified on
-real hardware** (unit tests cover parsing and policy; the D-Bus calls need a
-real system).
+Wi-Fi, Bluetooth, brightness and update actions go through the shared
+`mados_api` clients and `org.mados.System1`; they are tested against mock
+NetworkManager/BlueZ/logind services and a simulated bootc on private buses,
+and are **unverified on real hardware**.
 
 ## Providers
 

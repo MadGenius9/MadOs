@@ -32,6 +32,8 @@ pub trait SystemOps: Send + Sync {
     fn set_wifi(&self, enabled: bool) -> BoxFuture<'_, OpResult>;
     fn set_bluetooth(&self, enabled: bool) -> BoxFuture<'_, OpResult>;
     fn set_brightness(&self, percent: u8) -> BoxFuture<'_, OpResult>;
+    fn check_updates(&self) -> BoxFuture<'_, OpResult>;
+    fn install_update(&self) -> BoxFuture<'_, OpResult>;
 }
 
 /// Live implementation against the running system.
@@ -136,6 +138,68 @@ impl SystemOps for LiveOps {
                 Err(e) => Err(format!("logind refused: {e}")),
             }
         })
+    }
+
+    fn check_updates(&self) -> BoxFuture<'_, OpResult> {
+        Box::pin(async move {
+            let proxy = mados_api::SystemProxy::new(self.bus()?)
+                .await
+                .map_err(|e| e.to_string())?;
+            let json = proxy.check_for_update().await.map_err(|e| describe_system_error(&e))?;
+            let st: mados_api::UpdateStatus = serde_json::from_str(&json).map_err(|e| e.to_string())?;
+            if !st.available {
+                return Err(st
+                    .message
+                    .unwrap_or_else(|| "Updates are not available on this system.".into()));
+            }
+            Ok(match (&st.staged, &st.cached_update) {
+                (Some(staged), _) => format!(
+                    "An update ({}) is already installed and waits for a restart.",
+                    staged.version.as_deref().unwrap_or("new version")
+                ),
+                (None, Some(upd)) => format!(
+                    "An update is available: version {}. Say \"install updates\" to install it.",
+                    upd.version.as_deref().unwrap_or("unknown")
+                ),
+                (None, None) => "You're up to date.".into(),
+            })
+        })
+    }
+
+    fn install_update(&self) -> BoxFuture<'_, OpResult> {
+        Box::pin(async move {
+            use futures_util::StreamExt;
+            let proxy = mados_api::SystemProxy::new(self.bus()?)
+                .await
+                .map_err(|e| e.to_string())?;
+            // Subscribe before starting so the completion cannot be missed.
+            let mut finished = proxy.receive_update_job_finished().await.map_err(|e| e.to_string())?;
+            proxy.start_update().await.map_err(|e| describe_system_error(&e))?;
+            while let Some(sig) = finished.next().await {
+                let args = sig.args().map_err(|e| e.to_string())?;
+                if *args.operation() == "update" {
+                    return if *args.success() {
+                        Ok(args.message().to_string())
+                    } else {
+                        Err(args.message().to_string())
+                    };
+                }
+            }
+            Err("The system service stopped before the update finished.".into())
+        })
+    }
+}
+
+/// Short user-facing text for org.mados.System1 errors.
+fn describe_system_error(e: &zbus::Error) -> String {
+    match e {
+        zbus::Error::MethodError(name, _, _) if name.as_str().ends_with("NotAuthorized") => {
+            "Not authorized (administrator authentication is required).".into()
+        }
+        zbus::Error::MethodError(name, _, _) if name.as_str().ends_with("Busy") => {
+            "An update or rollback is already in progress.".into()
+        }
+        other => format!("System service error: {other}"),
     }
 }
 

@@ -117,6 +117,38 @@ pub fn parse(input: &str) -> Option<Intent> {
             return Some(Intent::SetBrightness { percent: 100 });
         }
     }
+    // Before the generic "install <app>" rule: "install updates" is an OS update.
+    if has_any(
+        t,
+        &[
+            "install update",
+            "install the update",
+            "install system update",
+            "install os update",
+            "update the system",
+            "update my computer",
+            "update my laptop",
+            "update the computer",
+            "upgrade the system",
+            "upgrade my system",
+        ],
+    ) {
+        return Some(Intent::InstallUpdate);
+    }
+    if has_any(
+        t,
+        &[
+            "check for update",
+            "any update",
+            "updates available",
+            "is there an update",
+            "are there updates",
+            "am i up to date",
+            "up to date",
+        ],
+    ) {
+        return Some(Intent::CheckUpdates);
+    }
     if t.contains("battery") || t.contains("charge left") {
         return Some(Intent::BatteryStatus);
     }
@@ -237,6 +269,18 @@ mod tests {
             p("run the command shutdown now"),
             Some(Intent::RunCommand { .. })
         ));
+    }
+
+    #[test]
+    fn updates_vs_apps() {
+        assert_eq!(p("Check for updates"), Some(Intent::CheckUpdates));
+        assert_eq!(p("Am I up to date?"), Some(Intent::CheckUpdates));
+        assert_eq!(p("install updates"), Some(Intent::InstallUpdate));
+        assert_eq!(p("Please update my laptop"), Some(Intent::InstallUpdate));
+        assert_eq!(
+            p("install discord"),
+            Some(Intent::InstallApp { name: "discord".into() })
+        );
     }
 
     #[test]

@@ -705,6 +705,7 @@ name = "mados-ai"
 version = "0.1.0"
 dependencies = [
  "blocking",
+ "futures-util",
  "mados-api",
  "mados-core",
  "serde",

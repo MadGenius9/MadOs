@@ -25,6 +25,8 @@ pub enum Intent {
     SetBrightness {
         percent: u8,
     },
+    CheckUpdates,
+    InstallUpdate,
     ConnectDevice {
         name: String,
     },
