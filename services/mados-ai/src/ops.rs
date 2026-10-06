@@ -13,7 +13,7 @@ use std::collections::HashMap;
 use std::future::Future;
 use std::path::{Path, PathBuf};
 use std::pin::Pin;
-use zbus::zvariant::{OwnedObjectPath, Value};
+use zbus::zvariant::OwnedObjectPath;
 use zbus::Connection;
 
 pub type BoxFuture<'a, T> = Pin<Box<dyn Future<Output = T> + Send + 'a>>;
@@ -118,43 +118,14 @@ impl SystemOps for LiveOps {
 
     fn set_bluetooth(&self, enabled: bool) -> BoxFuture<'_, OpResult> {
         Box::pin(async move {
-            let bus = self.bus()?;
-            let om = zbus::fdo::ObjectManagerProxy::builder(bus)
-                .destination("org.bluez")
-                .and_then(|b| b.path("/"))
-                .map_err(|e| e.to_string())?
-                .build()
-                .await
-                .map_err(|e| e.to_string())?;
-            let objects = om
-                .get_managed_objects()
-                .await
-                .map_err(|_| "Bluetooth service is not running.".to_string())?;
-            let mut adapters: Vec<&OwnedObjectPath> = objects
-                .iter()
-                .filter(|(_, ifaces)| ifaces.keys().any(|i| i.as_str() == "org.bluez.Adapter1"))
-                .map(|(p, _)| p)
-                .collect();
-            adapters.sort_by(|a, b| a.as_str().cmp(b.as_str()));
-            let adapter = adapters.first().ok_or("No Bluetooth adapter found.")?;
-            let props = zbus::fdo::PropertiesProxy::builder(bus)
-                .destination("org.bluez")
-                .and_then(|b| b.path(adapter.as_str()))
-                .map_err(|e| e.to_string())?
-                .build()
-                .await
-                .map_err(|e| e.to_string())?;
-            props
-                .set(
-                    "org.bluez.Adapter1"
-                        .try_into()
-                        .map_err(|e: zbus::names::Error| e.to_string())?,
-                    "Powered",
-                    Value::from(enabled),
-                )
-                .await
-                .map_err(|e| format!("BlueZ refused: {e}"))?;
-            Ok(format!("Bluetooth turned {}.", on_off(enabled)))
+            match mados_api::bluetooth::set_powered(self.bus()?, enabled).await {
+                Ok(true) => Ok(format!("Bluetooth turned {}.", on_off(enabled))),
+                Ok(false) => Err("No Bluetooth adapter found.".into()),
+                Err(zbus::Error::MethodError(name, _, _)) if name.as_str().ends_with("ServiceUnknown") => {
+                    Err("Bluetooth service is not running.".into())
+                }
+                Err(e) => Err(format!("BlueZ refused: {e}")),
+            }
         })
     }
 

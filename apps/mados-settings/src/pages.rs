@@ -625,6 +625,174 @@ pub fn network() -> gtk::Widget {
     root.upcast()
 }
 
+// ---------------------------------------------------------------- Bluetooth
+
+fn bluetooth_status() -> zbus::Result<mados_api::bluetooth::BluetoothStatus> {
+    let conn = bg::system_bus()?;
+    zbus::block_on(mados_api::bluetooth::status(conn.inner()))
+}
+
+pub fn bluetooth() -> gtk::Widget {
+    let (root, content) = widgets::page("Bluetooth", None);
+    let card = gtk::Box::builder()
+        .orientation(gtk::Orientation::Horizontal)
+        .spacing(12)
+        .css_classes(["card"])
+        .build();
+    let text = gtk::Box::new(gtk::Orientation::Vertical, 2);
+    text.set_hexpand(true);
+    text.append(
+        &gtk::Label::builder()
+            .label("Bluetooth")
+            .xalign(0.0)
+            .css_classes(["heading"])
+            .build(),
+    );
+    let note = gtk::Label::builder()
+        .xalign(0.0)
+        .wrap(true)
+        .css_classes(["dim-label"])
+        .build();
+    text.append(&note);
+    card.append(&text);
+    let switch = gtk::Switch::builder()
+        .valign(gtk::Align::Center)
+        .sensitive(false)
+        .build();
+    card.append(&switch);
+    content.append(&card);
+
+    content.append(
+        &gtk::Label::builder()
+            .label("Paired devices")
+            .xalign(0.0)
+            .css_classes(["heading"])
+            .build(),
+    );
+    let grid = Rc::new(RefCell::new(InfoGrid::new()));
+    content.append(&grid.borrow().grid);
+    let status = widgets::status_label();
+    content.append(&status);
+    content.append(
+        &gtk::Label::builder()
+            .label(format!(
+                "Pairing and connecting devices is not yet implemented in {} Settings.",
+                product_name()
+            ))
+            .xalign(0.0)
+            .wrap(true)
+            .css_classes(["dim-label"])
+            .build(),
+    );
+    let buttons = gtk::Box::new(gtk::Orientation::Horizontal, 8);
+    let refresh = gtk::Button::with_label("Refresh");
+    buttons.append(&refresh);
+    let kde = gtk::Button::builder()
+        .label("Open in KDE System Settings")
+        .sensitive(crate::kde_settings_available())
+        .build();
+    kde.connect_clicked(|_| {
+        let _ = std::process::Command::new(crate::KDE_SETTINGS)
+            .arg("kcm_bluetooth")
+            .spawn();
+    });
+    buttons.append(&kde);
+    content.append(&buttons);
+
+    let syncing = Rc::new(std::cell::Cell::new(false));
+    let load: Rc<dyn Fn()> = {
+        let (grid, status, note, switch, syncing) = (
+            grid.clone(),
+            status.clone(),
+            note.clone(),
+            switch.clone(),
+            syncing.clone(),
+        );
+        Rc::new(move || {
+            let (grid, status, note, switch, syncing) = (
+                grid.clone(),
+                status.clone(),
+                note.clone(),
+                switch.clone(),
+                syncing.clone(),
+            );
+            bg::run(bluetooth_status, move |r| {
+                let mut g = grid.borrow_mut();
+                g.clear();
+                match r {
+                    Ok(s) => match s.adapter {
+                        Some(a) => {
+                            syncing.set(true);
+                            switch.set_active(a.powered);
+                            switch.set_state(a.powered);
+                            syncing.set(false);
+                            switch.set_sensitive(true);
+                            note.set_label(&format!(
+                                "{} ({}) is {}.",
+                                if a.name.is_empty() { "Adapter" } else { &a.name },
+                                a.address,
+                                if a.powered { "on" } else { "off" }
+                            ));
+                            if s.devices.is_empty() {
+                                g.row("Devices", "No paired devices");
+                            }
+                            for d in &s.devices {
+                                let state = match (d.connected, d.paired) {
+                                    (true, _) => "Connected",
+                                    (false, true) => "Paired, not connected",
+                                    _ => "Not paired",
+                                };
+                                g.row(&d.name, &format!("{state}\n{}", d.address));
+                            }
+                        }
+                        None => {
+                            switch.set_sensitive(false);
+                            note.set_label("No Bluetooth adapter detected.");
+                        }
+                    },
+                    Err(e) => {
+                        switch.set_sensitive(false);
+                        note.set_label("Bluetooth service unavailable.");
+                        status.set_label(&format!("BlueZ: {}", bg::describe(&e)));
+                    }
+                }
+            });
+        })
+    };
+    {
+        let (load, status, syncing) = (load.clone(), status.clone(), syncing.clone());
+        switch.connect_state_set(move |sw, want| {
+            if syncing.get() {
+                return glib::Propagation::Proceed;
+            }
+            sw.set_sensitive(false);
+            status.set_label(if want {
+                "Turning Bluetooth on…"
+            } else {
+                "Turning Bluetooth off…"
+            });
+            let (load, status) = (load.clone(), status.clone());
+            bg::run(
+                move || -> zbus::Result<bool> {
+                    let conn = bg::system_bus()?;
+                    zbus::block_on(mados_api::bluetooth::set_powered(conn.inner(), want))
+                },
+                move |r| {
+                    match r {
+                        Ok(_) => status.set_label(""),
+                        Err(e) => status.set_label(&format!("Could not change Bluetooth: {}", bg::describe(&e))),
+                    }
+                    load();
+                },
+            );
+            glib::Propagation::Stop
+        });
+    }
+    load();
+    refresh.connect_clicked(move |_| load());
+    root.upcast()
+}
+
 fn assistant_call(
     f: impl FnOnce(&AssistantProxyBlocking<'static>) -> zbus::Result<String>,
 ) -> zbus::Result<AssistantReply> {

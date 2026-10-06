@@ -82,6 +82,8 @@ DBUS_SYSTEM_BUS_ADDRESS=$addr cargo run -p mados-settings -- --page=network
 ```
 
 `MOCK_NM_DENY=1` makes the mock refuse Wi-Fi changes, like polkit would.
+`--example mock-bluez` (with `MOCK_BLUEZ_DENY=1`) does the same for BlueZ and
+`--page=bluetooth`.
 
 ## Host safety
 

@@ -57,7 +57,7 @@ are **not** presented as MadOS technology.
 | Component | 0.1 status | Implementation |
 |---|---|---|
 | **mados-core** | implemented | `crates/mados-core`: product metadata, system information, logging, stable names |
-| **mados-api** | implemented | `crates/mados-api`: D-Bus contracts and client proxies; `network` client for NetworkManager; mock NetworkManager example for UI work |
+| **mados-api** | implemented | `crates/mados-api`: D-Bus contracts and client proxies; `network` (NetworkManager) and `bluetooth` (BlueZ) clients; mock NetworkManager/BlueZ examples for UI work |
 | **mados-daemon** (system service; part of *mados-permissions*) | implemented | `services/mados-daemon`: `org.mados.System1`; polkit-checked power actions via logind; bootc status |
 | **mados-permissions** | partial | polkit actions in `system/templates/org.mados.system.policy`, enforced in mados-daemon; assistant policy in `services/mados-ai/src/policy.rs` |
 | **mados-ai** | partial (architecture + rule-based provider) | `services/mados-ai`; see [ADR-003](ADR-003-mados-ai.md) |
@@ -116,7 +116,7 @@ service's own D-Bus API is used directly, which already enforces polkit):
 | Area | Owner today | MadOS API plan |
 |---|---|---|
 | Wi-Fi, networking | NetworkManager D-Bus | **done for status + radio**: `mados_api::network` is the single client used by Settings and mados-ai (NM polkit applies to the user) |
-| Bluetooth | BlueZ D-Bus | same |
+| Bluetooth | BlueZ D-Bus | **done for status + adapter power**: `mados_api::bluetooth`, shared by Settings and mados-ai |
 | Audio | PipeWire / WirePlumber | session-level API, M4 |
 | Displays, brightness | KWin / logind `SetBrightness` | M4 |
 | Power, reboot, shutdown | **org.mados.System1** → logind | done |
@@ -145,6 +145,8 @@ Sound, Power, Storage, Users, Applications, Updates, Assistant, Privacy.
 Implemented with real data/actions in 0.1: **About**, **Network & Wi-Fi**
 (NetworkManager status, devices, addresses; Wi-Fi radio switch authorized by
 NetworkManager's polkit; selecting networks still delegated to KDE),
+**Bluetooth** (BlueZ adapter state, paired/connected devices, adapter power;
+pairing still delegated to KDE),
 **Storage**, **Power** (restart/shut down through mados-daemon), **Updates**
 (read-only deployment status), **Assistant**. Every other category states that it is not implemented
 and, where KDE has a module, offers "Open in KDE System Settings" (a real,

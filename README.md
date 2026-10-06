@@ -39,6 +39,8 @@ KDE Plasma (Fedora Kinoite) as a temporary bootstrap, and this README says so.
   shows state, devices, connection and IPv4 address; the Wi-Fi switch changes
   the radio, and a refusal leaves the switch showing the real state with
   "Not authorized." (verified headless; real NetworkManager unverified).
+- Settings → Bluetooth against a mock BlueZ: adapter, paired/connected
+  devices, adapter power switch (verified headless; real BlueZ unverified).
 
 ### Implemented but unverified
 
@@ -53,7 +55,7 @@ untested.
 
 Installer polish and first-run, installing updates from Settings, automatic
 rollback, signed images, most Settings categories (they say so and open the
-KDE module instead), choosing a Wi-Fi network in MadOS Settings, assistant model providers, MadOS shell, file manager,
+KDE module instead), choosing a Wi-Fi network or pairing Bluetooth devices in MadOS Settings, assistant model providers, MadOS shell, file manager,
 terminal (Dolphin and Konsole are used).
 
 ## Build

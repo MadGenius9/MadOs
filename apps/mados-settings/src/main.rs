@@ -64,11 +64,7 @@ fn build(app: &gtk::Application) {
     // Order follows docs/architecture/overview.md (Settings categories).
     add("about", "About", pages::about(&product));
     add("network", "Network & Wi-Fi", pages::network());
-    add(
-        "bluetooth",
-        "Bluetooth",
-        pages::unavailable("Bluetooth", Some("kcm_bluetooth")),
-    );
+    add("bluetooth", "Bluetooth", pages::bluetooth());
     add("display", "Display", pages::unavailable("Display", Some("kcm_kscreen")));
     add("sound", "Sound", pages::unavailable("Sound", Some("kcm_pulseaudio")));
     add("power", "Power", pages::power());
