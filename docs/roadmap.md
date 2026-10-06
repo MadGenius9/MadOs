@@ -6,7 +6,7 @@ this environment allows; awaiting end-to-end verification), **planned**.
 | Milestone | Scope | Status |
 |---|---|---|
 | **M0 — Repository/bootstrap** | monorepo, CLAUDE.md, ADRs, product metadata, Makefile, CI, tests | done |
-| **M1 — Bootable VM image** | bootc Containerfile (Fedora 44 Kinoite base), qcow2 via image-builder, QEMU tooling, smoke test with boot markers, experimental installer ISO | implemented; image build + boot verified only once CI's `image` job runs (blocked in the bootstrap environment by network policy) |
+| **M1 — Bootable VM image** | bootc Containerfile (Fedora 44 Kinoite base), qcow2 via image-builder, QEMU tooling, smoke test with boot markers, experimental installer ISO | container image **builds and passes `bootc container lint` in CI**; qcow2 conversion and VM boot pending (first disk build hit an unsupported blueprint option, fixed) |
 | **M2 — Branded functional desktop** | MadOS look-and-feel, wallpaper, accent, os-release identity; terminal, files, browser (upstream) | implemented, unverified in a booted image |
 | **M3 — MadOS system services** | `mados-daemon` (`org.mados.System1`): system info, update status, polkit-authorized power | implemented; D-Bus/polkit logic tested on a private bus |
 | **M4 — Mad Settings** | GTK 4 app: About, Storage, Power, Updates (read-only), Assistant; other categories honestly marked; next: network, Bluetooth, display, sound pages backed by real APIs | partial |

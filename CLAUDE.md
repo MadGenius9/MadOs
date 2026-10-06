@@ -22,9 +22,12 @@ OSTree) as base + MadOS-owned services and apps on top:
 
 ## Current milestone
 
-M1 (bootable VM image) is implemented but its image build/boot has not yet
-been verified: the bootstrap environment blocks Fedora's servers. The CI
+M1 (bootable VM image): the bootc container image builds and passes
+`bootc container lint` in CI; qcow2 conversion and VM boot are not yet
+verified. The bootstrap environment blocks Fedora's servers, so the CI
 `image` job is the reference build. See `docs/roadmap.md` for status.
+image-builder only accepts some blueprint customizations for bootc disks
+(see `BOOTC_DISK_CUSTOMIZATIONS` in tests/config/validate.py).
 
 ## Commands
 

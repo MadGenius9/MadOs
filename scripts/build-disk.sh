@@ -12,9 +12,16 @@ set -eu
 need podman
 need openssl
 
-[ -f "$OUT/image-ref" ] || die "no image built yet; run 'make image' first"
-ref=$(cat "$OUT/image-ref")
-bid=$(cat "$OUT/build-id")
+# MADOS_BLUEPRINT_ONLY=1 writes the blueprint and stops (used by
+# tests/config/validate.py); nothing else is built and no credentials are kept.
+blueprint_only=${MADOS_BLUEPRINT_ONLY:-}
+if [ -z "$blueprint_only" ]; then
+    [ -f "$OUT/image-ref" ] || die "no image built yet; run 'make image' first"
+    ref=$(cat "$OUT/image-ref")
+    bid=$(cat "$OUT/build-id")
+else
+    bid=blueprint-only
+fi
 work="$OUT/build/disk"
 rm -rf "$work"
 mkdir -p "$work/output"
@@ -33,11 +40,13 @@ hash=$(printf '%s' "$password" | openssl passwd -6 -stdin)
         [ -r "$MADOS_DEV_SSH_PUBKEY" ] || die "cannot read MADOS_DEV_SSH_PUBKEY=$MADOS_DEV_SSH_PUBKEY"
         echo "key = \"$(tr -d '\n' < "$MADOS_DEV_SSH_PUBKEY")\""
     fi
-    echo
-    echo '[[customizations.filesystem]]'
-    echo 'mountpoint = "/"'
-    echo "minsize = \"${DISK_SIZE%G} GiB\""
 } > "$work/blueprint.toml"
+# Only customizations image-builder accepts for bootc disk images may appear
+# here (customizations.filesystem is NOT one; disk size is --image-size).
+if [ -n "$blueprint_only" ]; then
+    log "blueprint written to $work/blueprint.toml"
+    exit 0
+fi
 if [ -z "${MADOS_DEV_PASSWORD:-}" ]; then
     printf 'build %s\nuser: mados\npassword: %s\n' "$bid" "$password" > "$OUT/dev-credentials.txt"
     log "development password written to out/dev-credentials.txt"
@@ -55,6 +64,7 @@ $PODMAN run --rm --privileged --pull=newer \
     "$IMAGE_BUILDER" \
     build --blueprint /blueprint.toml --output-dir /output \
     --bootc-ref "$ref" --bootc-default-fs "$ROOTFS" \
+    --image-size "${DISK_SIZE%G} GiB" \
     qcow2
 
 disk=$(find "$work/output" -name '*.qcow2' | head -n 1)

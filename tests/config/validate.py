@@ -238,6 +238,39 @@ def validate_staging(tree: Path) -> None:
     check(not creds, f"possible hard-coded credentials in {creds}")
 
 
+# image-builder data/distrodefs/bootc-generic/imagetypes.yaml (supported_options_disk)
+BOOTC_DISK_CUSTOMIZATIONS = {
+    "bootloader", "directories", "disk", "files", "group", "ignition", "kernel", "user", "sshd",
+}
+
+
+def validate_blueprint() -> None:
+    """The disk blueprint may only use customizations image-builder supports
+    for bootc disk images (an unsupported one fails the build late, in CI)."""
+    import os
+    import tomllib
+
+    env = dict(os.environ, MADOS_BLUEPRINT_ONLY="1", MADOS_DEV_PASSWORD="validation-only")
+    env.pop("MADOS_DEV_SSH_PUBKEY", None)
+    r = subprocess.run(["sh", str(ROOT / "scripts/build-disk.sh")], env=env, capture_output=True, text=True)
+    if r.returncode != 0 and "not found" in r.stderr:
+        skipped.append(f"blueprint check ({r.stderr.strip()})")
+        return
+    check(r.returncode == 0, f"build-disk.sh blueprint-only failed: {r.stderr.strip()}")
+    bp_path = ROOT / "out/build/disk/blueprint.toml"
+    if r.returncode != 0 or not bp_path.exists():
+        return
+    bp = tomllib.loads(bp_path.read_text())
+    used = set(bp.get("customizations", {}))
+    check(used <= BOOTC_DISK_CUSTOMIZATIONS, f"blueprint uses unsupported customizations: {sorted(used - BOOTC_DISK_CUSTOMIZATIONS)}")
+    kernel = bp.get("customizations", {}).get("kernel", {})
+    check(set(kernel) <= {"append"}, "only customizations.kernel.append is supported for bootc disks")
+    users = bp.get("customizations", {}).get("user", [])
+    check(any(u.get("name") == "mados" for u in users), "blueprint must define the development user")
+    check(not (ROOT / "out/dev-credentials.txt").exists() or "validation-only" not in (ROOT / "out/dev-credentials.txt").read_text(),
+          "blueprint-only mode must not write credentials")
+
+
 def validate_shell() -> None:
     scripts = [str(p) for p in sorted(ROOT.glob("scripts/*.sh"))] + [
         str(ROOT / "system/rootfs/usr/libexec/mados/merge-os-release"),
@@ -254,6 +287,7 @@ def main() -> int:
     validate_product()
     validate_branding_centralized()
     validate_containerfile()
+    validate_blueprint()
     validate_os_release_merge(args.staging)
     validate_units(ROOT / "system/rootfs")
     validate_xml(ROOT / "system", staged=False)

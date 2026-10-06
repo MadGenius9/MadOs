@@ -59,7 +59,7 @@ FROM ${BASE_REF}
 RUN dnf -y install --setopt=install_weak_deps=False \
         konsole dolphin firefox qemu-guest-agent \
     && dnf clean all \
-    && rm -rf /var/cache/* /var/lib/dnf /var/log/*
+    && rm -rf /var/cache/* /var/lib/dnf /var/log/* /run/dnf
 
 COPY --from=builder /staging/ /
 

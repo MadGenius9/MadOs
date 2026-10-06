@@ -14,8 +14,8 @@ KDE Plasma (Fedora Kinoite) as a temporary bootstrap, and this README says so.
 
 | Area | Status |
 |---|---|
-| Bootable image definition (bootc, Fedora 44 Kinoite base) | written; **not yet built** — the development environment it was created in blocks Fedora's servers. CI builds and boots it on GitHub Actions (job `image`), but no run has completed yet |
-| qcow2 disk image via image-builder | written; unverified (same reason) |
+| Bootable container image (bootc, Fedora 44 Kinoite base) | **builds in CI** (GitHub Actions job `image`, run #1): components compile against Fedora 44, os-release merge yields `PRETTY_NAME="MadOS 0.1.0-dev"`, boot-report unit enabled, `bootc container lint` passes (13 checks). Cannot be built in the bootstrap dev environment (Fedora servers blocked) |
+| qcow2 disk image via image-builder | run #1 failed (unsupported `customizations.filesystem` for bootc disks); fixed, awaiting the next CI run |
 | Installer ISO (`bootc-generic-iso`) | written; **experimental**, unverified |
 | MadOS components (Rust) | built and tested: 31 unit/integration tests incl. D-Bus policy tests on a real (private) bus |
 | MadOS Settings (GTK 4) | runs; verified headless on Ubuntu (About, Assistant pages rendered with real data) |
