@@ -14,13 +14,13 @@ KDE Plasma (Fedora Kinoite) as a temporary bootstrap, and this README says so.
 
 | Area | Status |
 |---|---|
-| Bootable container image (bootc, Fedora 44 Kinoite base) | **builds in CI** (GitHub Actions job `image`, run #1): components compile against Fedora 44, os-release merge yields `PRETTY_NAME="MadOS 0.1.0-dev"`, boot-report unit enabled, `bootc container lint` passes (13 checks). Cannot be built in the bootstrap dev environment (Fedora servers blocked) |
-| qcow2 disk image via image-builder | **builds in CI** (run #2) |
+| Bootable container image (bootc, Fedora 44 Kinoite base) | **builds in CI** (GitHub Actions job `image`): components compile against Fedora 44, `bootc container lint` passes. Cannot be built in the bootstrap dev environment (Fedora servers blocked) |
+| qcow2 disk image via image-builder | **builds in CI** |
 | **Boots in QEMU/KVM (UEFI)** | **verified in CI run #2**: `MADOS_BOOT_OK` 57 s after power-on (version 0.1.0-dev, Fedora kernel 7.2.8-200.fc44), `graphical.target` reached with **no failed units**, active **Wayland KDE session**, network up (DHCP 10.0.2.15), clean **reboot** to a second successful boot, clean **shutdown** (QEMU exit 0) |
-| Installer ISO (`bootc-generic-iso`) | written; **experimental**, unverified |
-| MadOS components (Rust) | built and tested: 31 unit/integration tests incl. D-Bus policy tests on a real (private) bus |
-| MadOS Settings (GTK 4) | runs; verified headless on Ubuntu (About, Assistant pages rendered with real data) |
-| VM tooling + smoke test | harness verified by booting a real Linux kernel under QEMU/UEFI (TCG); full MadOS smoke test pending first image build |
+| Installer ISO (`bootc-generic-iso`) | written, with an unattended install test (`make iso-test`); **experimental**, not yet built |
+| MadOS components (Rust) | 57 unit/integration tests: D-Bus policy tests on a private bus; mock NetworkManager/BlueZ/AccountsService/logind; fake and simulated bootc; real PulseAudio server |
+| MadOS Settings (GTK 4) | every category has a real page (About, Network & Wi-Fi, Bluetooth, Display, Sound, Power, Storage, Users, Applications, Updates, Assistant, Privacy); verified headless against mocks/real test servers, not yet inside the VM |
+| VM tooling + smoke test | verified: harness self-test (real kernel, TCG) and the MadOS image (KVM) in CI |
 | Physical hardware | **untested — do not install** |
 
 ### What works (verified)
@@ -29,50 +29,44 @@ KDE Plasma (Fedora Kinoite) as a temporary bootstrap, and this README says so.
   UEFI): graphical target with no failed units, Wayland KDE session, network,
   clean reboot and shutdown — detected by MadOS's own boot markers, not
   screenshots.
-- `make build`, `make test`: Rust workspace, fmt/clippy clean, unit and D-Bus
-  integration tests, 127 static configuration checks, reproducibility check of
-  generated files, QEMU harness self-test.
+- `make build`, `make test`: fmt/clippy clean, 57 Rust tests, 156 static
+  configuration checks, reproducibility check of generated files, QEMU
+  harness self-test.
 - `madosctl about` / Settings → About: real version, kernel, CPU, memory,
   GPU, storage, hostname, architecture, session, build ID (gracefully
   "Unavailable" when absent).
-- Assistant pipeline: "How much battery is left?", "Why is my laptop running
-  slowly?", "What version am I running?" answered from real system data;
-  "Turn Bluetooth on" asks for confirmation; "sudo rm -rf /" is refused.
-- `org.mados.System1` refuses power actions for unauthorized callers and
-  checks polkit against the caller (tested with mocks on a private bus).
-- Settings → Network & Wi-Fi against a mock NetworkManager on a private bus:
-  shows state, devices, connection and IPv4 address; the Wi-Fi switch changes
-  the radio, and a refusal leaves the switch showing the real state with
-  "Not authorized." (verified headless; real NetworkManager unverified).
-- Settings → Bluetooth against a mock BlueZ: adapter, paired/connected
-  devices, adapter power switch (verified headless; real BlueZ unverified).
-- Updates: `org.mados.System1` check/install/rollback jobs (polkit-gated,
-  one at a time, completion signal) tested on a private bus and against a
-  fake `bootc` executable; Settings → Updates driven end to end against the
-  real service code with a simulated bootc (real bootc system unverified).
-- Sound: `mados-audio` reads outputs and changes volume/mute on a real
-  PulseAudio server in tests (cross-checked with `pactl`); Settings → Sound
-  driven headless against that server. On MadOS the server is PipeWire's
-  PulseAudio-compatible service (unverified in the VM yet).
-- Display brightness through logind `SetBrightness` against a mock logind;
-  Settings → Display shows connectors/preferred modes from sysfs and hides
-  the brightness slider when there is no backlight (real hardware unverified).
+- Assistant: "How much battery is left?", "Why is my laptop running
+  slowly?", "Check for updates" answered from real data; "Turn Bluetooth on",
+  "Set the volume to 30%", "Install updates" ask for confirmation first;
+  "sudo rm -rf /" is refused. Settings → Assistant → mados-ai →
+  org.mados.System1 verified end to end with a simulated bootc.
+- `org.mados.System1`: power and update actions are polkit-gated against the
+  caller; update/rollback jobs run one at a time and report completion
+  (private-bus tests, fake `bootc` executable).
+- Settings pages driven headless: Network & Wi-Fi and Bluetooth (mock
+  NetworkManager/BlueZ; switches always show the service's real state,
+  refusals shown as "Not authorized."), Sound (real PulseAudio test server,
+  cross-checked with `pactl`), Display (sysfs; brightness via logind,
+  mock-tested), Users (mock AccountsService), Applications (desktop entries),
+  Updates (check → install → pending restart, simulated bootc), Privacy
+  (read from the running assistant).
+- First-run welcome window: shown once per user, then never again.
 
 ### Implemented but unverified
 
 On the booted image: launching Konsole/Dolphin/Firefox/Settings and audio
-device detection (smoke checks added after run #2; first result in the next
-CI run), MadOS branding in Plasma (screenshot captured but not yet
-reviewed), SELinux mode, mados-daemon/mados-ai against the real
-polkit/logind/NetworkManager/BlueZ/bootc, the installer ISO. The Wi-Fi/Bluetooth/brightness assistant
-actions are implemented against NetworkManager/BlueZ/logind D-Bus APIs but
-untested.
+device detection (smoke checks added after run #2), SELinux enforcing check,
+MadOS branding in Plasma (screenshot captured, not yet reviewed), and all
+MadOS services against the *real* polkit, logind, NetworkManager, BlueZ,
+AccountsService, PipeWire and bootc. The installer ISO.
 
 ### Not implemented yet
 
-Installer polish and first-run, automatic rollback, published and signed
-update images (so "Check for Updates" has nothing to find yet), most Settings categories (they say so and open the
-KDE module instead), choosing a Wi-Fi network or pairing Bluetooth devices in MadOS Settings, assistant model providers, MadOS shell, file manager,
+Account setup during install, automatic rollback, published and signed
+update images (so "Check for Updates" has nothing to find yet), choosing a
+Wi-Fi network, pairing Bluetooth devices, choosing sound devices, display
+modes and adding users in MadOS Settings (each page says so and opens the
+KDE module), assistant model providers, MadOS shell, file manager and
 terminal (Dolphin and Konsole are used).
 
 ## Build
