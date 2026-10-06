@@ -53,7 +53,7 @@ mount -t devtmpfs dev /dev 2>/dev/null
 out=/dev/ttyS0
 echo "MADOS_BOOT_OK version=selftest build=selftest kernel=$(uname -r) selinux=enforcing state=running failed=none" > $out
 echo "MADOS_SESSION_OK type=selftest class=user desktop=selftest user=mados" > $out
-echo "MADOS_APPS terminal=ok files=ok browser=running settings=ok audio=unknown daemon=ok bootc=ok assistant=ok" > $out
+echo "MADOS_APPS terminal=ok files=ok browser=running settings=ok audio=unknown daemon=ok bootc=ok assistant=ok first_run=running kde_welcome=absent" > $out
 sleep 25
 echo "MADOS_SHUTDOWN" > $out
 poweroff -f

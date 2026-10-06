@@ -7,10 +7,13 @@ Boots an image in QEMU (UEFI) and checks, in order:
                 mados-boot-report.service after graphical.target)
   2. units      no failed systemd units (from the marker's failed= field)
      selinux    SELinux is enforcing (from the marker's selinux= field)
-  3. session    MADOS_SESSION_OK: an active Wayland/X11 user session
+  3. session    MADOS_SESSION_OK: an active Wayland/X11 user session of the
+                development user (--expect-user)
      apps       MADOS_APPS (dev images): terminal, file manager, browser and
                 settings each started and claimed their D-Bus name
      audio      MADOS_APPS audio=ok: sound card + PipeWire default sink
+     welcome    MADOS_APPS first_run=running kde_welcome=absent: the MadOS
+                first-run window opened at first login, KDE's Welcome Center not
      services   MADOS_APPS daemon/bootc/assistant=ok: MadOS's own services
                 answer on the real system and session buses
   4. network    a non-loopback interface with an IPv4 address (guest agent)
@@ -201,6 +204,12 @@ def run(ns: argparse.Namespace) -> int:
             report.add("apps", "fail" if bad else "pass", detail)
             audio = res.get("audio", "unknown")
             report.add("audio", {"ok": "pass", "unknown": "skip"}.get(audio, "fail"), f"audio={audio}")
+            welcome = {k: res.get(k) for k in ("first_run", "kde_welcome")}
+            if all(v is None for v in welcome.values()):
+                report.add("welcome", "skip", "image predates the welcome check")
+            else:
+                ok = welcome == {"first_run": "running", "kde_welcome": "absent"}
+                report.add("welcome", "pass" if ok else "fail", " ".join(f"{k}={v}" for k, v in welcome.items()))
             svc = {k: res.get(k) for k in ("daemon", "bootc", "assistant")}
             if all(v is None for v in svc.values()):
                 report.add("services", "skip", "image predates the services check")
@@ -211,6 +220,7 @@ def run(ns: argparse.Namespace) -> int:
             why = "no graphical session" if not session_ok else (m.group(2) if m else "no MADOS_APPS marker")
             report.add("apps", "fail" if ns.require_apps else "skip", why)
             report.add("audio", "skip", why)
+            report.add("welcome", "skip", why)
             report.add("services", "skip", why)
 
         # 4. network via guest agent

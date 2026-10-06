@@ -230,6 +230,9 @@ def validate_staging(tree: Path) -> None:
             check(True, "")
         except json.JSONDecodeError as e:
             check(False, f"{j.relative_to(tree)}: {e}")
+    kded = tree / "usr/share/mados/xdg/kded5rc"
+    check(kded.exists() and "[Module-kded_plasma_welcome]\nautoload=false" in kded.read_text(),
+          "KDE Welcome Center autostart must be off (MadOS first-run window replaces it)")
     env_script = tree / "etc/xdg/plasma-workspace/env/10-mados-xdg.sh"
     check(env_script.exists(), "Plasma env script not staged")
     check(not (tree / "etc/xdg/kdeglobals").exists(), "must not overwrite /etc/xdg/kdeglobals (use /usr/share/mados/xdg)")

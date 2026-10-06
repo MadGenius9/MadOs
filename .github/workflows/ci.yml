@@ -130,9 +130,10 @@ jobs:
             grep -a -E "MADOS_|Welcome to|SELinux|Reached target Graphical|Failed to start" out/smoke/serial.log | cut -c1-200 | head -60 || true
           fi
           if [ -f out/smoke/screen.png ] && command -v convert >/dev/null; then
-            convert out/smoke/screen.png -resize 800x -quality 70 out/smoke/thumb.jpg
-            echo "::group::screenshot thumbnail (base64 JPEG)"
-            base64 -w 0 out/smoke/thumb.jpg; echo
+            convert out/smoke/screen.png -resize 640x -quality 60 out/smoke/thumb.jpg
+            echo "::group::screenshot thumbnail (base64 JPEG, 76-column lines)"
+            sha256sum out/smoke/thumb.jpg
+            base64 -w 76 out/smoke/thumb.jpg
             echo "::endgroup::"
           fi
 

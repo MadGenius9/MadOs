@@ -69,7 +69,7 @@ are **not** presented as MadOS technology.
 | **mados-shell** | not started | Plasma is the shell until M9; see [ADR-002](ADR-002-desktop-bootstrap.md) |
 | **mados-files** | not started | Dolphin is used |
 | **mados-terminal** | not started | Konsole is used |
-| **mados-first-run** | implemented (welcome) | `apps/mados-first-run`: shown once per user at first login (XDG autostart + marker in `~/.config/mados/`), also in the app menu; account setup/onboarding flow is M6 |
+| **mados-first-run** | implemented (welcome) | `apps/mados-first-run`: shown once per user at first login (XDG autostart + marker in `~/.config/mados/`), also in the app menu; replaces KDE's Welcome Center at first login (its kded autostart is off by default, `/usr/share/mados/xdg/kded5rc`); account setup/onboarding flow is M6 |
 
 There are deliberately no empty directories for components that do not exist yet.
 

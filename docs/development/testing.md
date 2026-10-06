@@ -41,6 +41,11 @@ copy-on-write overlay) and checks:
      SELinux and unit hardening all allowed it), `bootc=ok` (real
      `bootc status` through the daemon), `assistant=ok` (org.mados.Assistant1
      answered a read-only request on the session bus).
+   - **welcome** — same marker: `first_run=running` (the MadOS first-run
+     window opened from XDG autostart) and `kde_welcome=absent` (KDE's
+     Welcome Center, which says "Welcome to Fedora!", is turned off through
+     `/usr/share/mados/xdg/kded5rc`). Detected from `/proc/<pid>/comm` of the
+     user's processes.
 4. **network** — via qemu-guest-agent: a non-loopback interface has IPv4.
 5. **screenshot** — QMP `screendump` to `out/smoke/screen.png` (for humans).
 6. **reboot** — guest-agent `guest-shutdown mode=reboot`; requires
@@ -58,7 +63,7 @@ harness):
 MADOS_BOOT_OK version=0.1.0-dev build=<id> kernel=<release> selinux=enforcing state=running failed=none
 MADOS_SESSION_OK type=wayland class=user desktop=KDE user=mados
 MADOS_SESSION_NONE reason=timeout
-MADOS_APPS terminal=ok files=ok browser=ok settings=ok audio=ok daemon=ok bootc=ok assistant=ok
+MADOS_APPS terminal=ok files=ok browser=ok settings=ok audio=ok daemon=ok bootc=ok assistant=ok first_run=running kde_welcome=absent
 MADOS_APPS_NONE reason=timeout
 MADOS_SHUTDOWN
 ```

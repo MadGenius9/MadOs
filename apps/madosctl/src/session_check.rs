@@ -4,7 +4,8 @@
 //! Launches the default applications and records whether each one reached
 //! its main loop, detected by the application claiming its D-Bus name on the
 //! session bus (a stronger signal than "the process was spawned"). Also
-//! checks that an audio device and a PipeWire default sink exist. The result
+//! checks that an audio device and a PipeWire default sink exist, and which
+//! first-login welcome window is open (MadOS's, not KDE's). The result
 //! is written to `$XDG_RUNTIME_DIR/mados/session-check.json`, which
 //! `madosctl boot-report` (system service) relays to the serial console as a
 //! `MADOS_APPS` marker for the VM smoke test.
@@ -12,6 +13,7 @@
 //! Programs are started by fixed absolute paths with fixed arguments.
 
 use serde::{Deserialize, Serialize};
+use std::os::unix::fs::MetadataExt;
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
 use std::time::{Duration, Instant};
@@ -32,6 +34,9 @@ const APPS: &[(&str, &str, &[&str], &str)] = &[
     ("settings", "/usr/bin/mados-settings", &[], "org.mados.Settings"),
 ];
 const WPCTL: &str = "/usr/bin/wpctl";
+/// Process names (`/proc/<pid>/comm`) of the first-login welcome windows.
+const FIRST_RUN_COMM: &str = "mados-first-run";
+const KDE_WELCOME_COMM: &str = "plasma-welcome";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -82,6 +87,12 @@ pub struct Report {
     /// org.mados.Assistant1 answered a read-only request.
     #[serde(default)]
     pub assistant: String,
+    /// MadOS first-run window (XDG autostart): "running" or "absent".
+    #[serde(default)]
+    pub first_run: String,
+    /// KDE Welcome Center, which MadOS turns off: "absent" or "running".
+    #[serde(default)]
+    pub kde_welcome: String,
 }
 
 impl Report {
@@ -97,6 +108,8 @@ impl Report {
             ("daemon", &self.daemon),
             ("bootc", &self.bootc),
             ("assistant", &self.assistant),
+            ("first_run", &self.first_run),
+            ("kde_welcome", &self.kde_welcome),
         ] {
             if !v.is_empty() {
                 parts.push(format!("{k}={v}"));
@@ -253,6 +266,23 @@ fn check_assistant() -> String {
     }
 }
 
+/// Whether a process named `comm` owned by `uid` runs, scanning `proc_root`
+/// (normally `/proc`).
+pub fn process_running(proc_root: &Path, comm: &str, uid: u32) -> bool {
+    let Ok(entries) = std::fs::read_dir(proc_root) else {
+        return false;
+    };
+    entries.flatten().any(|e| {
+        e.file_name().to_string_lossy().bytes().all(|b| b.is_ascii_digit())
+            && e.metadata().map(|m| m.uid() == uid).unwrap_or(false)
+            && std::fs::read_to_string(e.path().join("comm")).is_ok_and(|c| c.trim_end() == comm)
+    })
+}
+
+fn presence(running: bool) -> String {
+    if running { "running" } else { "absent" }.to_string()
+}
+
 fn report_path() -> Option<PathBuf> {
     std::env::var_os("XDG_RUNTIME_DIR").map(|d| PathBuf::from(d).join(REPORT_FILE))
 }
@@ -302,6 +332,8 @@ pub fn run(args: &[&str]) -> i32 {
         children.extend(child);
     }
     let (daemon, bootc) = check_daemon();
+    // /proc/self belongs to this process's user.
+    let uid = std::fs::metadata("/proc/self").map(|m| m.uid()).unwrap_or(u32::MAX);
     let report = Report {
         schema: REPORT_SCHEMA,
         apps: results,
@@ -309,10 +341,12 @@ pub fn run(args: &[&str]) -> i32 {
         daemon,
         bootc,
         assistant: check_assistant(),
+        first_run: presence(process_running(Path::new("/proc"), FIRST_RUN_COMM, uid)),
+        kde_welcome: presence(process_running(Path::new("/proc"), KDE_WELCOME_COMM, uid)),
     };
     println!(
-        "audio: {} daemon: {} bootc: {} assistant: {}",
-        report.audio, report.daemon, report.bootc, report.assistant
+        "audio: {} daemon: {} bootc: {} assistant: {} first_run: {} kde_welcome: {}",
+        report.audio, report.daemon, report.bootc, report.assistant, report.first_run, report.kde_welcome
     );
     for mut c in children {
         let _ = c.kill();
@@ -444,6 +478,24 @@ mod tests {
     }
 
     #[test]
+    fn finds_processes_by_name_and_owner() {
+        let root = std::env::temp_dir().join(format!("mados-proc-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        for (pid, comm) in [("42", "mados-first-run\n"), ("7", "plasmashell\n")] {
+            std::fs::create_dir_all(root.join(pid)).unwrap();
+            std::fs::write(root.join(pid).join("comm"), comm).unwrap();
+        }
+        std::fs::create_dir_all(root.join("self")).unwrap();
+        std::fs::write(root.join("self").join("comm"), "plasma-welcome\n").unwrap();
+        let me = std::fs::metadata(&root).unwrap().uid();
+        assert!(process_running(&root, "mados-first-run", me));
+        assert!(!process_running(&root, "mados-first-run", me + 1));
+        assert!(!process_running(&root, "plasma-welcome", me)); // not a pid directory
+        assert!(!process_running(&root.join("missing"), "plasmashell", me));
+        std::fs::remove_dir_all(&root).unwrap();
+    }
+
+    #[test]
     fn marker_format() {
         let r = Report {
             schema: 1,
@@ -463,8 +515,13 @@ mod tests {
             daemon: "ok".into(),
             bootc: "ok".into(),
             assistant: String::new(),
+            first_run: "running".into(),
+            kde_welcome: "absent".into(),
         };
-        assert_eq!(r.marker(), "terminal=ok browser=running audio=ok daemon=ok bootc=ok");
+        assert_eq!(
+            r.marker(),
+            "terminal=ok browser=running audio=ok daemon=ok bootc=ok first_run=running kde_welcome=absent"
+        );
         assert_eq!(token("bootc is not installed; x"), "bootc-is-not-installed--x");
     }
 }
