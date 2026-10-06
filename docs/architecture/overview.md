@@ -159,13 +159,16 @@ modes from sysfs; backlight slider through logind `SetBrightness`; modes and
 arrangement still delegated to KDE), **Sound** (output devices, volume, mute
 via `mados-audio`; device choice and input still delegated to KDE),
 **Users** (read-only list from AccountsService with administrator/standard
-roles; account changes still delegated to KDE),
+roles; account changes still delegated to KDE), **Applications** (installed
+apps from desktop entries: system image, system and user Flatpaks;
+install/remove opens Discover),
 **Storage**, **Power** (restart/shut down through mados-daemon), **Updates**
 (status, check, install, roll back, restart — through mados-daemon),
 **Assistant**, **Privacy** (assistant provider and where requests are
-processed, read from the running assistant). Every other category states that it is not implemented
-and, where KDE has a module, offers "Open in KDE System Settings" (a real,
-working control). No control pretends to change state.
+processed, read from the running assistant). Every category now shows real data. Within each page, what MadOS Settings
+cannot do yet is stated explicitly and, where KDE has a module, an "Open in
+KDE System Settings" button (a real, working control) is offered. No control
+pretends to change state.
 
 ## Logging
 

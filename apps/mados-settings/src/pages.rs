@@ -1395,49 +1395,83 @@ pub fn users() -> gtk::Widget {
     root.upcast()
 }
 
+// ---------------------------------------------------------------- Applications
+
+const DISCOVER: &str = "/usr/bin/plasma-discover";
+
+pub fn applications() -> gtk::Widget {
+    let (root, content) = widgets::page("Applications", None);
+    let summary = gtk::Label::builder()
+        .xalign(0.0)
+        .wrap(true)
+        .css_classes(["heading"])
+        .build();
+    content.append(&summary);
+    let grid = Rc::new(RefCell::new(InfoGrid::new()));
+    content.append(&grid.borrow().grid);
+    content.append(
+        &gtk::Label::builder()
+            .label(format!(
+                "Installing and removing apps and choosing default apps are not yet implemented in {} Settings.",
+                product_name()
+            ))
+            .xalign(0.0)
+            .wrap(true)
+            .css_classes(["dim-label"])
+            .build(),
+    );
+    let buttons = gtk::Box::new(gtk::Orientation::Horizontal, 8);
+    let discover = gtk::Button::builder()
+        .label("Install or Remove Apps (Discover)")
+        .sensitive(std::path::Path::new(DISCOVER).exists())
+        .build();
+    discover.connect_clicked(|_| {
+        let _ = std::process::Command::new(DISCOVER).spawn();
+    });
+    buttons.append(&discover);
+    let defaults = gtk::Button::builder()
+        .label("Default Apps (KDE System Settings)")
+        .sensitive(crate::kde_settings_available())
+        .build();
+    defaults.connect_clicked(|_| {
+        let _ = std::process::Command::new(crate::KDE_SETTINGS)
+            .arg("kcm_componentchooser")
+            .spawn();
+    });
+    buttons.append(&defaults);
+    content.append(&buttons);
+
+    let g = grid.clone();
+    bg::run(
+        || mados_core::apps::installed(std::path::Path::new("/"), mados_core::apps::home_dir().as_deref()),
+        move |apps| {
+            use mados_core::apps::AppSource;
+            let count = |src| apps.iter().filter(|a| a.source == src).count();
+            summary.set_label(&format!(
+                "{} apps: {} included with the system, {} Flatpak (all users), {} Flatpak (just you)",
+                apps.len(),
+                count(AppSource::System),
+                count(AppSource::FlatpakSystem),
+                count(AppSource::FlatpakUser)
+            ));
+            let mut g = g.borrow_mut();
+            for a in &apps {
+                let source = match a.source {
+                    AppSource::System => "Included with the system",
+                    AppSource::FlatpakSystem => "Flatpak · all users",
+                    AppSource::FlatpakUser => "Flatpak · just you",
+                };
+                g.row(&a.name, source);
+            }
+        },
+    );
+    root.upcast()
+}
+
 fn assistant_call(
     f: impl FnOnce(&AssistantProxyBlocking<'static>) -> zbus::Result<String>,
 ) -> zbus::Result<AssistantReply> {
     let proxy = AssistantProxyBlocking::new(&bg::session_bus()?)?;
     let json = f(&proxy)?;
     serde_json::from_str(&json).map_err(|e| zbus::Error::Failure(e.to_string()))
-}
-
-// ---------------------------------------------------------------- Not yet implemented
-
-/// A category MadOS Settings does not implement yet. Says so, and offers the
-/// upstream KDE module when it exists (a real, working control).
-pub fn unavailable(title: &str, kcm: Option<&'static str>) -> gtk::Widget {
-    let (root, content) = widgets::page(title, None);
-    content.append(
-        &gtk::Label::builder()
-            .label(format!(
-                "{title} settings are not yet implemented in {} Settings (development build).",
-                product_name()
-            ))
-            .xalign(0.0)
-            .wrap(true)
-            .build(),
-    );
-    if let Some(kcm) = kcm {
-        let available = crate::kde_settings_available();
-        let btn = gtk::Button::builder()
-            .label("Open in KDE System Settings")
-            .halign(gtk::Align::Start)
-            .sensitive(available)
-            .build();
-        let status = widgets::status_label();
-        if !available {
-            status.set_label("KDE System Settings is not installed on this system.");
-        }
-        let st = status.clone();
-        btn.connect_clicked(move |_| {
-            if let Err(e) = std::process::Command::new(crate::KDE_SETTINGS).arg(kcm).spawn() {
-                st.set_label(&format!("Could not open KDE System Settings: {e}"));
-            }
-        });
-        content.append(&btn);
-        content.append(&status);
-    }
-    root.upcast()
 }

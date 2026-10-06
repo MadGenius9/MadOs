@@ -7,6 +7,7 @@
 //! * [`buildinfo`] — image build metadata written at image build time.
 //! * [`names`] — stable technical identifiers (D-Bus names, paths).
 
+pub mod apps;
 pub mod buildinfo;
 pub mod log;
 pub mod names;

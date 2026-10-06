@@ -71,11 +71,7 @@ fn build(app: &gtk::Application) {
     add("power", "Power", pages::power());
     add("storage", "Storage", pages::storage());
     add("users", "Users", pages::users());
-    add(
-        "apps",
-        "Applications",
-        pages::unavailable("Applications", Some("kcm_componentchooser")),
-    );
+    add("apps", "Applications", pages::applications());
     add("updates", "Updates", pages::updates());
     add("assistant", "Assistant", pages::assistant());
     add("privacy", "Privacy", pages::privacy());
