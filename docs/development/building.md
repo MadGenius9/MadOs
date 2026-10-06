@@ -73,20 +73,22 @@ Anaconda-installed bootc systems. The qcow2 path is the primary 0.1 artifact.
 
 ## Developing the Settings UI without a full system
 
-`mados-api` ships a mock NetworkManager. On any machine with `dbus-daemon`:
+`mados-api` ships mock NetworkManager, BlueZ, AccountsService and logind
+services. On any machine with `dbus-daemon`:
 
 ```sh
 addr=$(dbus-daemon --session --print-address=1 --fork)
-DBUS_SYSTEM_BUS_ADDRESS=$addr cargo run -p mados-api --example mock-networkmanager &
+DBUS_SYSTEM_BUS_ADDRESS=$addr cargo run -p mados-api --example mock-system-services &
 DBUS_SYSTEM_BUS_ADDRESS=$addr cargo run -p mados-settings -- --page=network
 ```
 
-`MOCK_NM_DENY=1` makes the mock refuse Wi-Fi changes, like polkit would.
-`--example mock-bluez` (with `MOCK_BLUEZ_DENY=1`) does the same for BlueZ and
-`--page=bluetooth`. `cargo run -p mados-daemon --example dev-system-service`
-serves the real `org.mados.System1` implementation with an allow-all
-authorizer and a simulated bootc for `--page=updates` and `--page=power`
-(development only; examples are never installed in images).
+`MOCK_DENY=1` makes the mocks refuse changes, like polkit would.
+`cargo run -p mados-daemon --example dev-system-service` serves the real
+`org.mados.System1` implementation with an allow-all authorizer and a
+simulated bootc for `--page=updates` and `--page=power` (development only;
+examples are never installed in images; run it on its own private bus).
+For `--page=sound`, any PulseAudio-compatible server works (set
+`PULSE_SERVER`).
 
 ## Host safety
 

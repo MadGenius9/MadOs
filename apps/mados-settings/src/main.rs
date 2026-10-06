@@ -70,7 +70,7 @@ fn build(app: &gtk::Application) {
     add("sound", "Sound", pages::sound());
     add("power", "Power", pages::power());
     add("storage", "Storage", pages::storage());
-    add("users", "Users", pages::unavailable("Users", Some("kcm_users")));
+    add("users", "Users", pages::users());
     add(
         "apps",
         "Applications",

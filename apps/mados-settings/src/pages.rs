@@ -1322,6 +1322,79 @@ pub fn privacy() -> gtk::Widget {
     root.upcast()
 }
 
+// ---------------------------------------------------------------- Users
+
+/// The uid this app runs as (owner of /proc/self).
+fn current_uid() -> Option<u64> {
+    use std::os::unix::fs::MetadataExt;
+    std::fs::metadata("/proc/self").ok().map(|m| u64::from(m.uid()))
+}
+
+pub fn users() -> gtk::Widget {
+    let (root, content) = widgets::page("Users", None);
+    let grid = Rc::new(RefCell::new(InfoGrid::new()));
+    content.append(&grid.borrow().grid);
+    let status = widgets::status_label();
+    content.append(&status);
+    content.append(
+        &gtk::Label::builder()
+            .label(format!(
+                "Adding users and changing passwords or account types are not yet implemented in {} Settings.",
+                product_name()
+            ))
+            .xalign(0.0)
+            .wrap(true)
+            .css_classes(["dim-label"])
+            .build(),
+    );
+    let kde = gtk::Button::builder()
+        .label("Open in KDE System Settings")
+        .halign(gtk::Align::Start)
+        .sensitive(crate::kde_settings_available())
+        .build();
+    kde.connect_clicked(|_| {
+        let _ = std::process::Command::new(crate::KDE_SETTINGS).arg("kcm_users").spawn();
+    });
+    content.append(&kde);
+
+    let g = grid.clone();
+    bg::run(
+        || -> zbus::Result<Vec<mados_api::accounts::Account>> {
+            let conn = bg::system_bus()?;
+            zbus::block_on(mados_api::accounts::list(conn.inner()))
+        },
+        move |r| {
+            let mut g = g.borrow_mut();
+            match r {
+                Ok(users) if users.is_empty() => g.row("Users", "No user accounts reported"),
+                Ok(users) => {
+                    let me = current_uid();
+                    for u in &users {
+                        let mut role = if u.administrator { "Administrator" } else { "Standard" }.to_string();
+                        if u.locked {
+                            role.push_str(" · locked");
+                        }
+                        if Some(u.uid) == me {
+                            role.push_str(" · you");
+                        }
+                        let name = if u.real_name.is_empty() {
+                            u.user_name.clone()
+                        } else {
+                            format!("{} ({})", u.real_name, u.user_name)
+                        };
+                        g.row(&name, &role);
+                    }
+                }
+                Err(e) => {
+                    g.row("Users", "Unavailable");
+                    status.set_label(&format!("AccountsService: {}", bg::describe(&e)));
+                }
+            }
+        },
+    );
+    root.upcast()
+}
+
 fn assistant_call(
     f: impl FnOnce(&AssistantProxyBlocking<'static>) -> zbus::Result<String>,
 ) -> zbus::Result<AssistantReply> {

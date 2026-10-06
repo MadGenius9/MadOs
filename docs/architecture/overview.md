@@ -58,7 +58,7 @@ are **not** presented as MadOS technology.
 |---|---|---|
 | **mados-core** | implemented | `crates/mados-core`: product metadata, system information, logging, stable names |
 | **mados-audio** | implemented | `crates/mados-audio`: output devices, volume, mute through the user's sound server; separate crate so root services never link audio libraries |
-| **mados-api** | implemented | `crates/mados-api`: D-Bus contracts and client proxies; `network` (NetworkManager), `bluetooth` (BlueZ) and `display` (sysfs + logind) clients; mock NetworkManager/BlueZ examples for UI work |
+| **mados-api** | implemented | `crates/mados-api`: D-Bus contracts and client proxies; `network` (NetworkManager), `bluetooth` (BlueZ), `display` (sysfs + logind) and `accounts` (AccountsService) clients; `mock-system-services` example for UI work |
 | **mados-daemon** (system service; part of *mados-permissions*) | implemented | `services/mados-daemon`: `org.mados.System1`; polkit-checked power actions via logind; bootc status |
 | **mados-permissions** | partial | polkit actions in `system/templates/org.mados.system.policy`, enforced in mados-daemon; assistant policy in `services/mados-ai/src/policy.rs` |
 | **mados-ai** | partial (architecture + rule-based provider) | `services/mados-ai`; see [ADR-003](ADR-003-mados-ai.md) |
@@ -131,6 +131,7 @@ service's own D-Bus API is used directly, which already enforces polkit):
 | Storage info | mados-core (unprivileged statvfs) | done |
 | System info | mados-core / org.mados.System1 | done |
 | User session | logind | — |
+| User accounts | AccountsService D-Bus | **read-only list done**: `mados_api::accounts`; changes later (AccountsService enforces polkit) |
 
 Complex results are JSON strings with a `schema` field so the wire format can
 evolve without changing D-Bus signatures.
@@ -157,6 +158,8 @@ pairing still delegated to KDE), **Display** (connected outputs and preferred
 modes from sysfs; backlight slider through logind `SetBrightness`; modes and
 arrangement still delegated to KDE), **Sound** (output devices, volume, mute
 via `mados-audio`; device choice and input still delegated to KDE),
+**Users** (read-only list from AccountsService with administrator/standard
+roles; account changes still delegated to KDE),
 **Storage**, **Power** (restart/shut down through mados-daemon), **Updates**
 (status, check, install, roll back, restart — through mados-daemon),
 **Assistant**, **Privacy** (assistant provider and where requests are
