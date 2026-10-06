@@ -158,12 +158,18 @@ def run(ns: argparse.Namespace) -> int:
 
         # 3. graphical session
         m = serial.wait_for(SESSION_RE, ns.session_timeout, proc, boot_end)
-        if m and m.group(1) == "OK":
+        session_ok = bool(m and m.group(1) == "OK")
+        user = fields(m.group(2)).get("user") if session_ok else None
+        if session_ok and ns.expect_user and user is not None and user != ns.expect_user:
+            # e.g. Plasma Setup's own "plasma-setup" wizard session instead of
+            # the development user's desktop (CI runs #2-#5).
+            report.add("session", "fail", f"{m.group(2)} (expected user={ns.expect_user})")
+            session_ok = False
+        elif session_ok:
             report.add("session", "pass", m.group(2))
         else:
             detail = m.group(2) if m else "no session marker"
             report.add("session", "fail" if ns.require_session else "skip", detail)
-        session_ok = bool(m and m.group(1) == "OK")
 
         # 5. screenshot — early, before the screen locker or DPMS blank it.
         if session_ok:
@@ -294,6 +300,8 @@ def main(argv: list[str]) -> int:
     ap.add_argument("--agent-timeout", type=int, default=120)
     ap.add_argument("--shutdown-timeout", type=int, default=300)
     ap.add_argument("--require-session", action="store_true", help="fail if no graphical session")
+    ap.add_argument("--expect-user", default="mados",
+                    help="user the graphical session must belong to (dev disk user, scripts/build-disk.sh); '' = any")
     ap.add_argument("--require-apps", action="store_true", help="fail if the dev session check does not report")
     ap.add_argument("--settle", type=int, default=20, help="seconds to let the desktop draw before the screenshot")
     ap.add_argument("--apps-timeout", type=int, default=600)

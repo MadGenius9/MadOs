@@ -297,9 +297,9 @@ esac
 
     # Development-only autologin.
     if args.variant == "dev":
-        tmpl = (ROOT / "system/templates/sddm-dev-autologin.conf").read_text()
-        write(dest, "etc/sddm.conf.d/50-mados-dev-autologin.conf", tmpl.replace("@DEV_USER@", args.dev_user))
-        notes.append(f"dev variant: SDDM autologin for user {args.dev_user!r}")
+        tmpl = (ROOT / "system/templates/plasmalogin-dev-autologin.conf").read_text()
+        write(dest, "etc/plasmalogin.conf.d/50-mados-dev-autologin.conf", tmpl.replace("@DEV_USER@", args.dev_user))
+        notes.append(f"dev variant: Plasma Login Manager autologin for user {args.dev_user!r}")
         # Enable the dev session check for every user (global user unit).
         wants = dest / "usr/lib/systemd/user/graphical-session.target.wants"
         wants.mkdir(parents=True, exist_ok=True)

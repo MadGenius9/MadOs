@@ -55,8 +55,9 @@ to produce a qcow2 and writes a `.sha256` next to it.
 
 ### Development image conveniences (dev variant only)
 
-- SDDM autologin of user `mados` into Plasma (Wayland) — so smoke tests can
-  verify the session.
+- Plasma Login Manager autologin of user `mados` into Plasma (Wayland)
+  (`/etc/plasmalogin.conf.d/`; Fedora 44 KDE no longer uses SDDM) — so smoke
+  tests can verify the session.
 - Kernel arguments `console=tty0 console=ttyS0,115200n8` — boot markers on
   the serial port.
 

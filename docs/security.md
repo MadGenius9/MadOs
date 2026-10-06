@@ -54,7 +54,7 @@ and are verified absent from `release` builds by `tests/config/validate.py`:
 
 | What | Why | Where |
 |---|---|---|
-| SDDM **autologin** of user `mados` | VM smoke test must reach a graphical session without typing a password | `system/templates/sddm-dev-autologin.conf` |
+| Plasma Login Manager **autologin** of user `mados` | VM smoke test must reach a graphical session without typing a password | `system/templates/plasmalogin-dev-autologin.conf` → `/etc/plasmalogin.conf.d/` |
 | Serial console kernel arguments | boot markers for automated tests | `system/variants/dev/usr/lib/bootc/kargs.d/` |
 | `/etc/plasma-setup-done` | dev disks get their user at build time, so KDE's first-boot wizard (which creates the first account on release images) is marked done | `system/variants/dev/etc/` |
 | `mados-session-check` user unit | launches the default apps once per login and checks audio for the smoke test; runs as the user, starts only fixed program paths | `system/variants/dev/usr/lib/systemd/user/` |

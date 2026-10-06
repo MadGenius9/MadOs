@@ -235,8 +235,19 @@ def validate_staging(tree: Path) -> None:
     check(not (tree / "etc/xdg/kdeglobals").exists(), "must not overwrite /etc/xdg/kdeglobals (use /usr/share/mados/xdg)")
     run(["sh", "-n", str(env_script)], "env script syntax")
     variant = info.get("variant")
-    autologin = tree / "etc/sddm.conf.d/50-mados-dev-autologin.conf"
-    check(autologin.exists() == (variant == "dev"), "SDDM autologin must exist only in dev variant")
+    # Fedora 44 KDE's display manager is Plasma Login Manager; it ignores
+    # /etc/sddm.conf.d. Marking Plasma Setup done without a working autologin
+    # leaves dev images at the login screen (CI run #6).
+    autologin = tree / "etc/plasmalogin.conf.d/50-mados-dev-autologin.conf"
+    check(autologin.exists() == (variant == "dev"), "Plasma Login Manager autologin must exist only in dev variant")
+    check(not (tree / "etc/sddm.conf.d").exists(), "etc/sddm.conf.d is ignored by Plasma Login Manager (Fedora 44)")
+    if autologin.exists():
+        conf = autologin.read_text()
+        check(re.search(r"^\[Autologin\]$", conf, re.M) is not None, "autologin config lacks [Autologin]")
+        check(re.search(r"^User=[a-z_][a-z0-9_-]*$", conf, re.M) is not None, "autologin config lacks a valid User=")
+        check(re.search(r"^Session=plasma$", conf, re.M) is not None, "autologin must start the plasma (Wayland) session")
+    if (tree / "etc/plasma-setup-done").exists():
+        check(autologin.exists(), "plasma-setup-done without autologin leaves the VM at the login screen")
     check((tree / "etc/plasma-setup-done").exists() == (variant == "dev"),
           "Plasma Setup may be marked done only in dev images (release images need it to create the first user)")
     session_check = tree / "usr/lib/systemd/user/mados-session-check.service"

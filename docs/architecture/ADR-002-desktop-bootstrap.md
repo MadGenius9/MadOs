@@ -12,8 +12,10 @@ before 0.1 would delay a bootable system by years and add risk everywhere.
 ## Decision
 
 Use **KDE Plasma 6 (Wayland)** as delivered by Fedora Kinoite as the
-bootstrap desktop, with SDDM as display manager, and Konsole, Dolphin and
-Firefox as terminal, file manager and browser.
+bootstrap desktop, with its display manager, and Konsole, Dolphin and
+Firefox as terminal, file manager and browser. (Amended: Fedora 44 KDE ships
+**Plasma Login Manager**, KDE's SDDM successor, rather than SDDM; MadOS
+configures it through `/etc/plasmalogin.conf.d/`.)
 
 MadOS customizes it only through **isolated, additive** mechanisms:
 
@@ -43,6 +45,6 @@ compositor).
 2. M9: a MadOS shell replaces `plasmashell` on top of KWin (or another
    wlroots/Smithay compositor), started by a `mados-session` systemd user
    target instead of Plasma's.
-3. Later: MadOS login/lock screen replace SDDM/kscreenlocker; the base image
+3. Later: MadOS login/lock screen replace Plasma Login Manager/kscreenlocker; the base image
    moves from Kinoite to `fedora-bootc` plus an explicit package list
    (ADR-001 migration path), dropping unused KDE components.

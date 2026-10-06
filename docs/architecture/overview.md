@@ -17,8 +17,8 @@ are **not** presented as MadOS technology.
 │                           org.mados.Assistant1 (mados-ai, user)    │
 │ Policy                    polkit actions org.mados.*               │
 ├────────────────────────────────────────────────────────────────────┤
-│ Bootstrap desktop         KDE Plasma 6 (Wayland), SDDM, KWin,      │  upstream
-│ (temporary, ADR-002)      Konsole, Dolphin, Firefox                │  (Fedora Kinoite)
+│ Bootstrap desktop         KDE Plasma 6 (Wayland), KWin, Plasma     │  upstream
+│ (temporary, ADR-002)      Login Manager, Konsole, Dolphin, Firefox │  (Fedora Kinoite)
 ├────────────────────────────────────────────────────────────────────┤
 │ Platform services         systemd, logind, D-Bus, polkit,          │  upstream
 │                           NetworkManager, BlueZ, PipeWire, Flatpak │
@@ -45,7 +45,7 @@ are **not** presented as MadOS technology.
 | Networking | NetworkManager | Fedora | used by mados-ai (Wi-Fi radio) |
 | Bluetooth | BlueZ | Fedora | used by mados-ai (adapter power) |
 | Audio | PipeWire, WirePlumber | Fedora | volume/mute via `mados-audio` (PulseAudio-compatible API) |
-| Desktop session | KDE Plasma 6, KWin, SDDM | Fedora Kinoite | temporary bootstrap; MadOS defaults applied |
+| Desktop session | KDE Plasma 6, KWin, Plasma Login Manager | Fedora Kinoite | temporary bootstrap; MadOS defaults applied |
 | Terminal | Konsole | KDE | used as-is in 0.1 |
 | File manager | Dolphin | KDE | used as-is in 0.1 |
 | Browser | Firefox | Mozilla/Fedora | used as-is in 0.1 |

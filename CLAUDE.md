@@ -26,7 +26,10 @@ OSTree) as base + MadOS-owned services and apps on top:
 
 M1 (bootable VM image) is verified for the qcow2 path: CI run #2 built the
 image and booted it under KVM/UEFI (graphical target, no failed units,
-Wayland KDE session, network, clean reboot/shutdown). The installer ISO is
+Wayland KDE session, network, clean reboot/shutdown). That session was KDE's
+first-boot wizard (`plasma-setup` user); autologin of the dev user `mados`
+is not yet verified. Fedora 44 KDE uses Plasma Login Manager, not SDDM:
+configure it in `/etc/plasmalogin.conf.d/`. The installer ISO is
 still experimental. The bootstrap environment blocks Fedora's servers, so the CI
 `image` job is the reference build. See `docs/roadmap.md` for status.
 image-builder only accepts some blueprint customizations for bootc disks

@@ -5,7 +5,7 @@
 //! the journal and the console (the serial port in test VMs):
 //!
 //!   MADOS_BOOT_OK version=… build=… kernel=… selinux=enforcing|permissive|disabled state=running|degraded failed=…
-//!   MADOS_SESSION_OK type=wayland class=user desktop=…   (or MADOS_SESSION_NONE)
+//!   MADOS_SESSION_OK type=wayland class=user desktop=… user=…   (or MADOS_SESSION_NONE)
 //!   MADOS_APPS terminal=ok files=ok browser=ok settings=ok audio=ok
 //!                                                        (dev images only; relayed
 //!                                                        from `madosctl session-check`)
@@ -166,7 +166,7 @@ fn graphical_session() -> zbus::Result<Option<(String, u32)>> {
         .await?;
         let sessions: Vec<(String, u32, String, String, zbus::zvariant::OwnedObjectPath)> =
             mgr.call("ListSessions", &()).await?;
-        for (_id, uid, _user, _seat, path) in sessions {
+        for (_id, uid, user, _seat, path) in sessions {
             let s = zbus::Proxy::new(&conn, "org.freedesktop.login1", path, "org.freedesktop.login1.Session").await?;
             let typ: String = s.get_property("Type").await?;
             let class: String = s.get_property("Class").await?;
@@ -175,7 +175,7 @@ fn graphical_session() -> zbus::Result<Option<(String, u32)>> {
                 let desktop: String = s.get_property("Desktop").await.unwrap_or_default();
                 return Ok(Some((
                     format!(
-                        "type={typ} class={class} desktop={}",
+                        "type={typ} class={class} desktop={} user={user}",
                         if desktop.is_empty() { "unknown" } else { &desktop }
                     ),
                     uid,
