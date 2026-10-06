@@ -40,6 +40,12 @@ impl AssistantService {
     fn provider(&self) -> String {
         self.inner.provider_name().to_string()
     }
+
+    /// True when requests are processed on this device only.
+    #[zbus(property)]
+    fn local(&self) -> bool {
+        self.inner.provider_is_local()
+    }
 }
 
 /// Human-readable rendering of a reply for CLI use.

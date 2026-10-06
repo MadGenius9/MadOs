@@ -74,8 +74,10 @@ runtime), OpenAI, Anthropic, Gemini. Requirements for adding one:
    the `Intent` enum).
 2. Credentials come from the user's keyring (Secret Service) at runtime —
    never from this repository, the image, or plain-text config.
-3. Requests leaving the device require an explicit user opt-in setting, shown
-   in Settings → Privacy (M5).
+3. Report `is_local()` truthfully: it is published as the `Local` property of
+   `org.mados.Assistant1` and shown in Settings → Privacy ("Where requests
+   are processed"). Requests leaving the device require an explicit user
+   opt-in setting (M5).
 
 ## Consequences
 

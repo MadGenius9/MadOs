@@ -113,7 +113,8 @@ Errors: `org.mados.System1.Error.NotAuthorized`, `…Error.Failed`, `…Error.Bu
 (another update/rollback job is running). `ApiLevel` is 2.
 
 `org.mados.Assistant1` (session bus, `/org/mados/Assistant1`, mados-ai, user):
-`Ask(s) → s`, `Confirm(s) → s`, `Cancel(s)`, property `Provider`. Replies are
+`Ask(s) → s`, `Confirm(s) → s`, `Cancel(s)`, properties `Provider` and `Local`
+(true when requests are processed on the device). Replies are
 JSON `AssistantReply` (`crates/mados-api/src/lib.rs`).
 
 Service boundaries for other areas (planned; until then the owning upstream
@@ -158,7 +159,8 @@ arrangement still delegated to KDE), **Sound** (output devices, volume, mute
 via `mados-audio`; device choice and input still delegated to KDE),
 **Storage**, **Power** (restart/shut down through mados-daemon), **Updates**
 (status, check, install, roll back, restart — through mados-daemon),
-**Assistant**. Every other category states that it is not implemented
+**Assistant**, **Privacy** (assistant provider and where requests are
+processed, read from the running assistant). Every other category states that it is not implemented
 and, where KDE has a module, offers "Open in KDE System Settings" (a real,
 working control). No control pretends to change state.
 

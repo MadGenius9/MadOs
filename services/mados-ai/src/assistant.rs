@@ -85,6 +85,10 @@ impl<O: SystemOps> Assistant<O> {
         self.provider.name()
     }
 
+    pub fn provider_is_local(&self) -> bool {
+        self.provider.is_local()
+    }
+
     /// Handles a request from `owner` (the caller's unique bus name).
     pub async fn ask(&self, owner: &str, text: &str) -> AssistantReply {
         if text.len() > 2000 {

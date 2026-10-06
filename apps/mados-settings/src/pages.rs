@@ -1266,6 +1266,62 @@ pub fn sound() -> gtk::Widget {
     root.upcast()
 }
 
+// ---------------------------------------------------------------- Privacy
+
+pub fn privacy() -> gtk::Widget {
+    let (root, content) = widgets::page("Privacy", None);
+    content.append(
+        &gtk::Label::builder()
+            .label("Assistant")
+            .xalign(0.0)
+            .css_classes(["heading"])
+            .build(),
+    );
+    let grid = Rc::new(RefCell::new(InfoGrid::new()));
+    content.append(&grid.borrow().grid);
+    content.append(
+        &gtk::Label::builder()
+            .label(format!(
+                "Location, screen lock and usage history settings are not yet implemented in {} Settings.",
+                product_name()
+            ))
+            .xalign(0.0)
+            .wrap(true)
+            .css_classes(["dim-label"])
+            .build(),
+    );
+    let g = grid.clone();
+    bg::run(
+        || -> zbus::Result<(String, bool)> {
+            let proxy = AssistantProxyBlocking::new(&bg::session_bus()?)?;
+            Ok((proxy.provider()?, proxy.local()?))
+        },
+        move |r| {
+            let mut g = g.borrow_mut();
+            match r {
+                Ok((provider, local)) => {
+                    g.row("Language provider", &provider);
+                    g.row(
+                        "Where requests are processed",
+                        if local {
+                            "On this device. Nothing you ask is sent over the network."
+                        } else {
+                            "By an online service. Requests leave this device."
+                        },
+                    );
+                    g.row(
+                        "What it can do",
+                        "Only a fixed set of permission-checked actions; it cannot run commands. Changes always ask first.",
+                    );
+                    g.row("Configuration", "~/.config/mados/assistant.toml");
+                }
+                Err(e) => g.row("Assistant", &format!("Not running ({})", bg::describe(&e))),
+            }
+        },
+    );
+    root.upcast()
+}
+
 fn assistant_call(
     f: impl FnOnce(&AssistantProxyBlocking<'static>) -> zbus::Result<String>,
 ) -> zbus::Result<AssistantReply> {

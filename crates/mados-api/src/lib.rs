@@ -92,6 +92,10 @@ pub trait Assistant {
     /// Name of the active language provider (e.g. `rules`).
     #[zbus(property)]
     fn provider(&self) -> zbus::Result<String>;
+
+    /// True when requests are processed on this device only.
+    #[zbus(property)]
+    fn local(&self) -> zbus::Result<bool>;
 }
 
 /// Deployment state reported by bootc (subset we display).

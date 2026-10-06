@@ -78,7 +78,7 @@ fn build(app: &gtk::Application) {
     );
     add("updates", "Updates", pages::updates());
     add("assistant", "Assistant", pages::assistant());
-    add("privacy", "Privacy", pages::unavailable("Privacy", None));
+    add("privacy", "Privacy", pages::privacy());
 
     let sidebar = gtk::StackSidebar::builder().stack(&stack).width_request(200).build();
     let layout = gtk::Box::new(gtk::Orientation::Horizontal, 0);

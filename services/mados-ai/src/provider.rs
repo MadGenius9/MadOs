@@ -16,6 +16,9 @@ use std::path::Path;
 
 pub trait Provider: Send + Sync {
     fn name(&self) -> &str;
+    /// True when requests are interpreted on this device (nothing is sent
+    /// over the network). Shown to the user in Settings → Privacy.
+    fn is_local(&self) -> bool;
     fn interpret(&self, text: &str) -> Option<Intent>;
 }
 
@@ -24,6 +27,9 @@ pub struct RulesProvider;
 impl Provider for RulesProvider {
     fn name(&self) -> &str {
         "rules"
+    }
+    fn is_local(&self) -> bool {
+        true
     }
     fn interpret(&self, text: &str) -> Option<Intent> {
         crate::rules::parse(text)
