@@ -23,6 +23,9 @@ use std::time::{Duration, Instant};
 const SYSTEMCTL: &str = "/usr/bin/systemctl";
 /// Present only in development images (system/variants/dev).
 const SESSION_CHECK_UNIT: &str = "/usr/lib/systemd/user/mados-session-check.service";
+/// The session check may take up to 4 apps x 90 s plus 30 s for audio;
+/// matches vm_smoke.py's default --apps-timeout.
+const SESSION_CHECK_WAIT: Duration = Duration::from_secs(600);
 
 pub fn run(args: &[&str]) -> i32 {
     let mut timeout = Duration::from_secs(180);
@@ -69,7 +72,7 @@ pub fn run(args: &[&str]) -> i32 {
             Ok(Some((s, uid))) => {
                 println!("MADOS_SESSION_OK {s}");
                 if Path::new(SESSION_CHECK_UNIT).exists() {
-                    relay_session_check(uid, timeout);
+                    relay_session_check(uid, SESSION_CHECK_WAIT);
                 }
                 return 0;
             }
