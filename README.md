@@ -12,6 +12,10 @@ KDE Plasma (Fedora Kinoite) as a temporary bootstrap, and this README says so.
 
 ## Current status
 
+![MadOS 0.1.0-dev desktop at first login, captured by the CI smoke test (run #8)](docs/images/desktop-ci-run8.jpg)
+
+*First login of a development image in QEMU/KVM, captured by CI run #8: MadOS wallpaper, MadOS first-run window, KDE Plasma panel (the temporary bootstrap desktop).*
+
 | Area | Status |
 |---|---|
 | Bootable container image (bootc, Fedora 44 Kinoite base) | **builds in CI** (GitHub Actions job `image`): components compile against Fedora 44, `bootc container lint` passes. Cannot be built in the bootstrap dev environment (Fedora servers blocked) |
@@ -19,7 +23,7 @@ KDE Plasma (Fedora Kinoite) as a temporary bootstrap, and this README says so.
 | **Apps, audio, MadOS services in the booted VM** | **verified in CI run #7 in the development user's own session** (run #5 had shown the same inside KDE's first-boot wizard session): Konsole, Dolphin, Firefox and MadOS Settings each started and claimed their D-Bus names; sound card + PipeWire default sink present; `org.mados.System1` (real `bootc status`) and `org.mados.Assistant1` answered on the real buses; SELinux **enforcing**; network, clean reboot and shutdown. Run #5 was marked failed only because `mcelog.service` (Intel-only) failed on an AMD CI host; run #6 verified it is now skipped (no failed units) |
 | **MadOS identity at boot** | **verified (runs #4, #5)**: systemd banner "Welcome to MadOS 0.1.0-dev!", KDE's first-boot screen shows "Powered by MadOS" (os-release branding) |
 | **Boots in QEMU/KVM (UEFI)** | **verified in CI run #2**: `MADOS_BOOT_OK` 57 s after power-on (version 0.1.0-dev, Fedora kernel 7.2.8-200.fc44), `graphical.target` reached with **no failed units**, an active **Wayland KDE session** (KDE's first-boot wizard, found out in run #6), network up (DHCP 10.0.2.15), clean **reboot** to a second successful boot, clean **shutdown** (QEMU exit 0) |
-| **Development user's desktop** | **verified in CI run #7**: Plasma Login Manager logs `mados` in (`MADOS_SESSION_OK type=wayland class=user desktop=KDE user=mados`, 58 s after power-on) and the desktop shows the MadOS wallpaper. Fedora 44 KDE uses **Plasma Login Manager**, not SDDM; the sessions seen in runs #2–#5 belonged to KDE's first-boot wizard (`plasma-setup` user), and run #6 stopped at the login screen. Run #7's screenshot also showed KDE's Welcome Center saying "Welcome to Fedora!"; MadOS now turns its autostart off (MadOS's own first-run window greets the user instead), **unverified until the next CI run** |
+| **Development user's desktop** | **verified in CI runs #7 and #8**: Plasma Login Manager logs `mados` in (`MADOS_SESSION_OK type=wayland class=user desktop=KDE user=mados`, about 70 s after power-on); the desktop shows the MadOS wallpaper and, at first login, the MadOS first-run window, while KDE's Welcome Center ("Welcome to Fedora!", seen in run #7) stays closed (`first_run=running kde_welcome=absent`, run #8). Fedora 44 KDE uses **Plasma Login Manager**, not SDDM; the sessions in runs #2–#5 belonged to KDE's first-boot wizard (`plasma-setup` user) |
 | Installer ISO (`bootc-generic-iso`) | written, with an unattended install test (`make iso-test`); **experimental**, not yet built |
 | MadOS components (Rust) | 57 unit/integration tests: D-Bus policy tests on a private bus; mock NetworkManager/BlueZ/AccountsService/logind; fake and simulated bootc; real PulseAudio server |
 | MadOS Settings (GTK 4) | every category has a real page (About, Network & Wi-Fi, Bluetooth, Display, Sound, Power, Storage, Users, Applications, Updates, Assistant, Privacy); verified headless against mocks/real test servers, not yet inside the VM |
@@ -28,10 +32,10 @@ KDE Plasma (Fedora Kinoite) as a temporary bootstrap, and this README says so.
 
 ### What works (verified)
 
-- **The MadOS image builds and boots** (GitHub Actions runs #2, #5, #6 and #7,
+- **The MadOS image builds and boots** (GitHub Actions runs #2, #5–#8,
   QEMU/KVM, UEFI): graphical target with no failed units, SELinux enforcing,
   autologin of the development user into a Wayland Plasma session with the
-  MadOS wallpaper (run #7), network, clean reboot and shutdown — detected by
+  MadOS wallpaper and the MadOS first-run window (runs #7, #8), network, clean reboot and shutdown — detected by
   MadOS's own boot markers, not screenshots. Run #7 also verified, in that
   session, that the terminal, file manager, browser and MadOS Settings
   start, that audio hardware and a PipeWire sink are present, and that
@@ -61,10 +65,9 @@ KDE Plasma (Fedora Kinoite) as a temporary bootstrap, and this README says so.
 
 ### Implemented but unverified
 
-On the booted image: KDE's Welcome Center staying closed at first login
-while the MadOS first-run window opens (checked by the smoke test from the
-next CI run), the MadOS look-and-feel and accent colour (only the wallpaper
-was seen), and all
+On the booted image: the MadOS Plasma look-and-feel and accent colour (the
+screenshot shows the wallpaper and MadOS's own windows, not a check of
+Plasma's settings), and all
 MadOS services against the *real* polkit, logind, NetworkManager, BlueZ,
 AccountsService, PipeWire and bootc. The installer ISO.
 
