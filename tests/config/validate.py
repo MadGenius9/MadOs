@@ -100,6 +100,10 @@ def validate_containerfile() -> None:
     installer = (ROOT / "image/installer/Containerfile").read_text()
     check("xconfig --startxonboot" in installer, "installer interactive-defaults.ks must set xconfig --startxonboot")
     test_ks = (ROOT / "tests/smoke/iso_install.py").read_text()
+    # Anaconda copies a selinux= boot option to the installed system (CI run #13).
+    for name, text in (("image/installer/Containerfile", installer), ("tests/smoke/iso_install.py", test_ks)):
+        code = "\n".join(l for l in text.splitlines() if not l.lstrip().startswith("#"))
+        check(not re.search(r"\bselinux=0\b", code), f"{name}: installer must not boot with selinux=0 (use enforcing=0)")
     check("\nxconfig --startxonboot\n" in test_ks, "iso_install.py kickstart must set xconfig --startxonboot")
     env = (ROOT / "image/config.env").read_text()
     keys = dict(

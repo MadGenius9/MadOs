@@ -36,15 +36,20 @@ RUN test -n "${ISO_LABEL}" && test -n "${PAYLOAD_REF}" && test -n "${TARGET_REF}
         "grub2:" \
         "  entries:" \
         "    - name: \"Install ${PRODUCT_NAME}\"" \
-        "      linux: \"/images/pxeboot/vmlinuz inst.stage2=hd:LABEL=${ISO_LABEL} console=tty0 inst.graphical selinux=0 rhgb quiet\"" \
+        "      linux: \"/images/pxeboot/vmlinuz inst.stage2=hd:LABEL=${ISO_LABEL} console=tty0 inst.graphical enforcing=0 rhgb quiet\"" \
         "      initrd: \"/images/pxeboot/initrd.img\"" \
         > /usr/lib/image-builder/bootc/iso.yaml \
     && printf 'xconfig --startxonboot\nbootc --source-imgref containers-storage:%s --target-imgref %s\n' \
         "${PAYLOAD_REF}" "${TARGET_REF}" > /usr/share/anaconda/interactive-defaults.ks
 
+# enforcing=0 above makes SELinux permissive in the installer environment
+# only. Upstream's recipe uses selinux=0, but Anaconda copies a selinux= boot
+# option to the installed system (CI run #13: SELinux disabled after install);
+# enforcing= is not copied, so the installed system stays enforcing
+# (docs/security.md).
+#
 # The following is normally done by lorax to make Anaconda work; this is the
-# minimum documented by upstream. selinux=0 above applies to the installer
-# live environment only, never to the installed system (docs/security.md).
+# minimum documented by upstream.
 RUN echo "install:x:0:0:root:/root:/usr/libexec/anaconda/run-anaconda" >> /etc/passwd \
     && echo "install::14438:0:99999:7:::" >> /etc/shadow \
     && passwd -d root

@@ -62,9 +62,14 @@ and are verified absent from `release` builds by `tests/config/validate.py`:
 | `qemu-guest-agent` installed | clean reboot/shutdown and network checks from tests | installed in all images; activates only when a virtio guest-agent port exists; Fedora's default config blocks `guest-exec` and file RPCs |
 
 **Installer ISO (experimental):** the installer's *live environment* boots
-with `selinux=0`, following upstream image-builder's documented Anaconda
-setup. It affects only the installer environment, not the installed system,
-which boots with SELinux enforcing. Revisit when the ISO path matures.
+with SELinux **permissive** (`enforcing=0`). It affects only the installer
+environment; the installed system boots with SELinux enforcing, which the
+ISO install test checks. Upstream image-builder's recipe uses `selinux=0`
+instead, but Anaconda carries a `selinux=` boot option over to the installed
+system: CI run #13 installed a system with SELinux **disabled**, which the
+smoke test caught. Never use `selinux=0` on the installer command line
+(`tests/config/validate.py` enforces this). Revisit (enforcing installer
+environment) when the ISO path matures.
 
 **Never use dev images on real hardware or untrusted networks.**
 

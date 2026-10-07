@@ -121,7 +121,7 @@ def main(argv: list[str]) -> int:
         kernel=kernel,
         initrd=initrd,
         # Same as the ISO's boot entry, plus a serial console for the log.
-        append=f"inst.stage2=hd:LABEL={label} inst.text console=tty0 console=ttyS0,115200n8 selinux=0",
+        append=f"inst.stage2=hd:LABEL={label} inst.text console=tty0 console=ttyS0,115200n8 enforcing=0",
         memory_mb=4096,
         cpus=4,
         audio="none",
