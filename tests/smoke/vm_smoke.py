@@ -14,8 +14,9 @@ Boots an image in QEMU (UEFI) and checks, in order:
      audio      MADOS_APPS audio=ok: sound card + PipeWire default sink
      welcome    MADOS_APPS first_run=running kde_welcome=absent: the MadOS
                 first-run window opened at first login, KDE's Welcome Center not
-     defaults   MADOS_APPS defaults=ok: plasmashell's XDG_CONFIG_DIRS starts with
-                the MadOS defaults (look-and-feel, accent, kded settings)
+     defaults   MADOS_APPS defaults=ok: in plasmashell's XDG_CONFIG_DIRS the MadOS
+                defaults (look-and-feel, accent, kded) precede /etc/xdg; only
+                Plasma's own ~/.config/kdedefaults may come first
      services   MADOS_APPS daemon/bootc/assistant=ok: MadOS's own services
                 answer on the real system and session buses
   4. network    a non-loopback interface with an IPv4 address (guest agent)

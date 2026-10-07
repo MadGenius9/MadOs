@@ -114,6 +114,7 @@ jobs:
         run: make setup || true
 
       - name: Build bootable container image
+        id: image
         run: make image
 
       - name: Build qcow2 disk image
@@ -137,12 +138,15 @@ jobs:
             echo "::endgroup::"
           fi
 
+      # The ISO needs only the container image, so a failing qcow2 smoke test
+      # does not hide ISO results.
       - name: Build installer ISO (experimental)
-        if: github.event_name == 'workflow_dispatch' && inputs.build_iso
+        id: iso
+        if: ${{ !cancelled() && steps.image.outcome == 'success' && github.event_name == 'workflow_dispatch' && inputs.build_iso }}
         run: make iso
 
       - name: Install from the ISO and boot the result (experimental)
-        if: github.event_name == 'workflow_dispatch' && inputs.build_iso
+        if: ${{ !cancelled() && steps.iso.outcome == 'success' }}
         run: |
           sudo apt-get install -y -q --no-install-recommends xorriso dosfstools mtools
           rm -f out/*.qcow2

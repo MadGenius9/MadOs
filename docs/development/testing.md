@@ -46,10 +46,13 @@ copy-on-write overlay) and checks:
      Welcome Center, which says "Welcome to Fedora!", is turned off through
      `/usr/share/mados/xdg/kded5rc`). Detected from `/proc/<pid>/comm` of the
      user's processes.
-   - **defaults** — same marker: `defaults=ok` when the running
-     `plasmashell`'s `XDG_CONFIG_DIRS` (from `/proc/<pid>/environ`) starts
-     with `/usr/share/mados/xdg`, so Plasma reads the MadOS look-and-feel,
-     accent and kded defaults before Fedora's `/etc/xdg`.
+   - **defaults** — same marker: `defaults=ok` when, in the running
+     `plasmashell`'s `XDG_CONFIG_DIRS` (from `/proc/<pid>/environ`),
+     `/usr/share/mados/xdg` comes before every system directory, so Plasma
+     reads the MadOS look-and-feel, accent and kded defaults before Fedora's
+     `/etc/xdg`. Only Plasma's own per-user `~/.config/kdedefaults` (which
+     startplasma prepends, filled from the active look-and-feel) may come
+     first; otherwise the marker says `after-<first entry>`.
 4. **network** — via qemu-guest-agent: a non-loopback interface has IPv4.
 5. **screenshot** — QMP `screendump` to `out/smoke/screen.png` (for humans).
 6. **reboot** — guest-agent `guest-shutdown mode=reboot`; requires

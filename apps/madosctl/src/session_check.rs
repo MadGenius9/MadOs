@@ -295,17 +295,24 @@ pub fn process_running(proc_root: &Path, comm: &str, uid: u32) -> bool {
 }
 
 /// Checks a process environment (`/proc/<pid>/environ`, NUL-separated) for
-/// the MadOS defaults directory at the front of XDG_CONFIG_DIRS.
+/// the MadOS defaults directory ahead of every system config directory in
+/// XDG_CONFIG_DIRS. startplasma itself prepends the user's
+/// `~/.config/kdedefaults` (defaults of the active look-and-feel package),
+/// so that one entry may come first.
 pub fn defaults_status(environ: &[u8]) -> String {
-    let dirs = environ
+    let Some(dirs) = environ
         .split(|b| *b == 0)
         .find_map(|v| v.strip_prefix(b"XDG_CONFIG_DIRS="))
-        .map(|v| String::from_utf8_lossy(v).into_owned());
-    match dirs {
-        None => "no-xdg-config-dirs".into(),
-        Some(d) if d.split(':').next() == Some(MADOS_XDG_DIR) => "ok".into(),
-        Some(d) if d.split(':').any(|x| x == MADOS_XDG_DIR) => "not-first".into(),
-        Some(_) => "missing".into(),
+        .map(|v| String::from_utf8_lossy(v).into_owned())
+    else {
+        return "no-xdg-config-dirs".into();
+    };
+    let mut entries = dirs.split(':').filter(|d| !d.is_empty()).peekable();
+    while entries.next_if(|d| d.ends_with("/kdedefaults")).is_some() {}
+    match entries.next() {
+        Some(MADOS_XDG_DIR) => "ok".into(),
+        Some(first) if dirs.split(':').any(|x| x == MADOS_XDG_DIR) => format!("after-{}", token(first)),
+        _ => "missing".into(),
     }
 }
 
@@ -549,9 +556,16 @@ mod tests {
             defaults_status(&env("XDG_CONFIG_DIRS=/usr/share/mados/xdg:/etc/xdg")),
             "ok"
         );
+        // As in a real Plasma session (CI run #11): startplasma prepends kdedefaults.
+        assert_eq!(
+            defaults_status(&env(
+                "XDG_CONFIG_DIRS=/home/m/.config/kdedefaults:/usr/share/mados/xdg:/etc/xdg"
+            )),
+            "ok"
+        );
         assert_eq!(
             defaults_status(&env("XDG_CONFIG_DIRS=/etc/xdg:/usr/share/mados/xdg")),
-            "not-first"
+            "after--etc-xdg"
         );
         assert_eq!(defaults_status(&env("XDG_CONFIG_DIRS=/etc/xdg")), "missing");
         assert_eq!(defaults_status(&env("X=1")), "no-xdg-config-dirs");
