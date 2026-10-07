@@ -43,10 +43,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # A stalled package mirror once held this step for 17+ minutes (run #18).
       - name: Install build and test dependencies
+        timeout-minutes: 10
         run: |
-          sudo apt-get update -q
-          sudo apt-get install -y -q --no-install-recommends \
+          sudo apt-get update -q -o Acquire::Retries=3 -o Acquire::http::Timeout=30
+          sudo apt-get install -y -q -o Acquire::Retries=3 -o Acquire::http::Timeout=30 --no-install-recommends \
             libgtk-4-dev libdbus-1-dev libpulse-dev pkg-config dbus shellcheck \
             pulseaudio pulseaudio-utils \
             librsvg2-bin desktop-file-utils libxml2-utils \
@@ -98,9 +100,10 @@ jobs:
           df -h /
 
       - name: Install VM tooling
+        timeout-minutes: 10
         run: |
-          sudo apt-get update -q
-          sudo apt-get install -y -q --no-install-recommends \
+          sudo apt-get update -q -o Acquire::Retries=3 -o Acquire::http::Timeout=30
+          sudo apt-get install -y -q -o Acquire::Retries=3 -o Acquire::http::Timeout=30 --no-install-recommends \
             podman qemu-system-x86 qemu-utils ovmf openssl imagemagick
 
       - name: Enable KVM
@@ -148,7 +151,7 @@ jobs:
       - name: Install from the ISO and boot the result (experimental)
         if: ${{ !cancelled() && steps.iso.outcome == 'success' }}
         run: |
-          sudo apt-get install -y -q --no-install-recommends xorriso dosfstools mtools
+          sudo apt-get install -y -q -o Acquire::Retries=3 -o Acquire::http::Timeout=30 --no-install-recommends xorriso dosfstools mtools
           rm -f out/*.qcow2
           make iso-test
 
