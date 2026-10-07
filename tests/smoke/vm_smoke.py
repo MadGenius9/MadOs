@@ -194,7 +194,12 @@ def run(ns: argparse.Namespace) -> int:
         if selinux is None:
             report.add("selinux", "skip", "marker has no selinux field (older image)")
         else:
-            report.add("selinux", "pass" if selinux == "enforcing" else "fail", f"selinux={selinux}")
+            # Denials are shown for diagnosis; they fail the test only through
+            # their effects (failed units, missing session, ...).
+            avcs = re.findall(r"MADOS_AVC (.*)", serial.text[: m.end()])
+            report.add("selinux", "pass" if selinux == "enforcing" else "fail",
+                       f"selinux={selinux} denials={len(avcs)}{'+' if len(avcs) >= 8 else ''}"
+                       + "".join(f"\n         {a[:200]}" for a in avcs))
         boot_end = m.end()
 
         # 3. graphical session

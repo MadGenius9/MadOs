@@ -100,6 +100,13 @@ def validate_containerfile() -> None:
     installer = (ROOT / "image/installer/Containerfile").read_text()
     check("xconfig --startxonboot" in installer, "installer interactive-defaults.ks must set xconfig --startxonboot")
     test_ks = (ROOT / "tests/smoke/iso_install.py").read_text()
+    # Anaconda-written files need the installed system's labels (CI run #14).
+    include = "%include /usr/share/anaconda/mados-relabel.ks"
+    check("COPY relabel.ks /usr/share/anaconda/mados-relabel.ks" in installer and include in installer,
+          "installer must ship relabel.ks and include it from interactive-defaults.ks")
+    check(include in test_ks, "iso_install.py kickstart must include mados-relabel.ks")
+    relabel = (ROOT / "image/installer/relabel.ks").read_text()
+    check(relabel.count("%post") == 1 and "%end" in relabel, "relabel.ks must be one %post section")
     # Anaconda copies a selinux= boot option to the installed system (CI run #13).
     for name, text in (("image/installer/Containerfile", installer), ("tests/smoke/iso_install.py", test_ks)):
         code = "\n".join(l for l in text.splitlines() if not l.lstrip().startswith("#"))

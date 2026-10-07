@@ -68,7 +68,11 @@ ISO install test checks. Upstream image-builder's recipe uses `selinux=0`
 instead, but Anaconda carries a `selinux=` boot option over to the installed
 system: CI run #13 installed a system with SELinux **disabled**, which the
 smoke test caught. Never use `selinux=0` on the installer command line
-(`tests/config/validate.py` enforces this). Revisit (enforcing installer
+(`tests/config/validate.py` enforces this). At the end of the install,
+`image/installer/relabel.ks` relabels `/etc` and `/var/home` of the installed
+system with that system's own policy, because files Anaconda writes there
+could carry labels it does not expect (CI run #14: `rpm-ostreed.service`
+failed with SELinux enforcing). Revisit (enforcing installer
 environment) when the ISO path matures.
 
 **Never use dev images on real hardware or untrusted networks.**

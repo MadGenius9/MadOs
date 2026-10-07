@@ -31,10 +31,12 @@ first-boot wizard (`plasma-setup` user); runs #7/#8 verified autologin of the
 dev user `mados`, the apps, MadOS services and the MadOS first-run window
 (KDE's Welcome Center is off) in that session. Fedora 44 KDE
 uses Plasma Login Manager, not SDDM: configure it in `/etc/plasmalogin.conf.d/`. The installer ISO is
-still experimental: in CI run #13 it built, installed unattended and the installed
-system reached the MadOS desktop, but with SELinux disabled: Anaconda copies a
-`selinux=` boot option to the target, so the installer must never boot with
-`selinux=0` (now `enforcing=0`; not yet re-verified). The bootstrap environment blocks Fedora's servers, so the CI
+still experimental: in CI run #14 it built, installed unattended and the installed
+system reached the MadOS desktop with SELinux enforcing; one unit
+(rpm-ostreed) failed on labels of Anaconda-written files, relabelled by
+`image/installer/relabel.ks` (not yet re-verified). Anaconda copies a
+`selinux=` boot option to the target: never boot the installer with
+`selinux=0` (it uses `enforcing=0`). The bootstrap environment blocks Fedora's servers, so the CI
 `image` job is the reference build. See `docs/roadmap.md` for status.
 image-builder only accepts some blueprint customizations for bootc disks
 (see `BOOTC_DISK_CUSTOMIZATIONS` in tests/config/validate.py).

@@ -27,6 +27,8 @@ ARG ISO_LABEL
 ARG PRODUCT_NAME
 ARG PAYLOAD_REF
 ARG TARGET_REF
+# Relabels what Anaconda writes into the installed system (see relabel.ks).
+COPY relabel.ks /usr/share/anaconda/mados-relabel.ks
 # interactive-defaults.ks: `xconfig --startxonboot` makes the installed system
 # boot to the desktop (graphical.target) even after a text-mode install.
 RUN test -n "${ISO_LABEL}" && test -n "${PAYLOAD_REF}" && test -n "${TARGET_REF}" \
@@ -39,7 +41,7 @@ RUN test -n "${ISO_LABEL}" && test -n "${PAYLOAD_REF}" && test -n "${TARGET_REF}
         "      linux: \"/images/pxeboot/vmlinuz inst.stage2=hd:LABEL=${ISO_LABEL} console=tty0 inst.graphical enforcing=0 rhgb quiet\"" \
         "      initrd: \"/images/pxeboot/initrd.img\"" \
         > /usr/lib/image-builder/bootc/iso.yaml \
-    && printf 'xconfig --startxonboot\nbootc --source-imgref containers-storage:%s --target-imgref %s\n' \
+    && printf 'xconfig --startxonboot\nbootc --source-imgref containers-storage:%s --target-imgref %s\n%%include /usr/share/anaconda/mados-relabel.ks\n' \
         "${PAYLOAD_REF}" "${TARGET_REF}" > /usr/share/anaconda/interactive-defaults.ks
 
 # enforcing=0 above makes SELinux permissive in the installer environment

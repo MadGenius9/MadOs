@@ -70,6 +70,16 @@ pub fn run(args: &[&str]) -> i32 {
             println!("MADOS_UNIT_LOG {unit}: {}", line.chars().take(200).collect::<String>());
         }
     }
+    // SELinux denials of this boot, so a policy or labelling problem is
+    // diagnosable from the serial console too.
+    let avc = Command::new(JOURNALCTL)
+        .args(["-b", "-o", "cat", "--no-pager", "-n", "8", "--grep", "avc: +denied"])
+        .output()
+        .map(|o| String::from_utf8_lossy(&o.stdout).into_owned())
+        .unwrap_or_default();
+    for line in avc.lines().filter(|l| l.contains("avc:")) {
+        println!("MADOS_AVC {}", line.chars().take(300).collect::<String>());
+    }
     let kernel = std::fs::read_to_string("/proc/sys/kernel/osrelease").unwrap_or_default();
     let selinux = selinux_mode(std::fs::read_to_string("/sys/fs/selinux/enforce").ok().as_deref());
     println!(
