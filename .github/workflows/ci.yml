@@ -156,6 +156,14 @@ jobs:
             echo "--- $f"
             grep -a -E "MADOS_|anaconda|Installing|Traceback|error|Error|Welcome to" "$f" | cut -c1-200 | tail -60 || true
           done
+          shot=$(ls out/iso-install/boot/screen.* 2>/dev/null | head -n 1)
+          if [ -n "$shot" ] && command -v convert >/dev/null; then
+            convert "$shot" -resize 640x -quality 60 out/iso-install/boot/thumb.jpg
+            echo "::group::installed system screenshot thumbnail (base64 JPEG, 76-column lines)"
+            sha256sum out/iso-install/boot/thumb.jpg
+            base64 -w 76 out/iso-install/boot/thumb.jpg
+            echo "::endgroup::"
+          fi
 
       - name: Collect results
         if: always()
@@ -164,6 +172,12 @@ jobs:
           cp out/*.sha256 out/build-id out/image-ref results/ 2>/dev/null || true
           cp out/smoke/report.json out/smoke/serial.log out/smoke/qemu.log \
              out/smoke/screen.* results/ 2>/dev/null || true
+          if [ -d out/iso-install ]; then
+            mkdir -p results/iso-install
+            cp out/iso-install/serial.log results/iso-install/install-serial.log 2>/dev/null || true
+            cp out/iso-install/boot/serial.log results/iso-install/boot-serial.log 2>/dev/null || true
+            cp out/iso-install/boot/report.json out/iso-install/boot/screen.* results/iso-install/ 2>/dev/null || true
+          fi
           ls -la results
 
       - uses: actions/upload-artifact@v4

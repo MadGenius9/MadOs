@@ -49,8 +49,36 @@ APPS_RE = re.compile(r"MADOS_APPS(_NONE)? (.*)")
 APP_KEYS = ("terminal", "files", "browser", "settings")
 
 
+# CSI (colours, cursor), OSC (terminal titles, "ESC ] ... BEL|ESC \") and two-byte escapes.
+ANSI_RE = re.compile(r"\x1b(?:\[[0-?]*[ -/]*[@-~]|\][^\x07\x1b]*(?:\x07|\x1b\\)?|[@-Z\\-_])")
+PROBLEM_RE = re.compile(
+    r"FAILED|Failed to|Timed out|Dependency failed|[Ee]mergency mode|[Rr]escue mode|A start job is running|"
+    r"Cannot open|Kernel panic|not found|\b[Ee]rror:"
+)
+
+
 def fields(s: str) -> dict[str, str]:
     return dict(kv.split("=", 1) for kv in s.split() if "=" in kv)
+
+
+def boot_diagnostics(text: str, problems: int = 25, tail: int = 30) -> list[str]:
+    """Readable excerpt of a serial log for a boot that never reported:
+    lines that look like problems, then the last lines (ANSI codes removed)."""
+    lines = [ANSI_RE.sub("", l).replace("\r", "").strip() for l in text.splitlines()]
+    lines = [l[:200] for l in lines if l]
+    found = [l for l in lines if PROBLEM_RE.search(l)][-problems:]
+    return [f"problem: {l}" for l in found] + [f"last:    {l}" for l in lines[-tail:]]
+
+
+def screenshot(cfg: vm.VmConfig, workdir: Path, name: str = "screen") -> Path:
+    qmp = vm.Qmp(cfg.qmp_sock)
+    shot = workdir / f"{name}.png"
+    try:
+        qmp.execute("screendump", filename=str(shot), format="png")
+    except RuntimeError:
+        shot = workdir / f"{name}.ppm"
+        qmp.execute("screendump", filename=str(shot))
+    return shot
 
 
 class Serial:
@@ -144,7 +172,14 @@ def run(ns: argparse.Namespace) -> int:
         m = serial.wait_for(BOOT_RE, timeout, proc)
         if not m:
             reason = f"QEMU exited with {proc.returncode}" if proc.poll() is not None else f"no marker within {timeout}s"
-            report.add("boot", "fail", reason)
+            if proc.poll() is None:
+                try:
+                    reason += f"; screen: {screenshot(cfg, workdir)}"
+                except (OSError, TimeoutError, RuntimeError, ConnectionError) as e:
+                    reason += f"; no screenshot ({e})"
+            serial.poll()
+            diag = boot_diagnostics(serial.text)
+            report.add("boot", "fail", reason + "".join(f"\n         {l}" for l in diag))
             return finish(report, workdir, proc, serial)
         boot = fields(m.group(1))
         report.add("boot", "pass", f"{time.monotonic() - started:.0f}s, version={boot.get('version')} kernel={boot.get('kernel')}")
@@ -180,16 +215,8 @@ def run(ns: argparse.Namespace) -> int:
         if session_ok:
             time.sleep(ns.settle)
         try:
-            qmp = vm.Qmp(cfg.qmp_sock)
-            shot = workdir / "screen.png"
-            try:
-                qmp.execute("screendump", filename=str(shot), format="png")
-            except RuntimeError:
-                shot = workdir / "screen.ppm"
-                qmp.execute("screendump", filename=str(shot))
-            report.add("screenshot", "pass", str(shot))
+            report.add("screenshot", "pass", str(screenshot(cfg, workdir)))
         except (OSError, TimeoutError, RuntimeError, ConnectionError) as e:
-            qmp = None
             report.add("screenshot", "skip", str(e))
 
 
@@ -272,10 +299,10 @@ def run(ns: argparse.Namespace) -> int:
                 if ga:
                     ga.execute("guest-shutdown", expect_reply=False, mode="powerdown")
                     how = "guest agent"
-                elif qmp:
-                    qmp.execute("system_powerdown")
+                else:
+                    vm.Qmp(cfg.qmp_sock).execute("system_powerdown")
                     how = "ACPI power button"
-            except (OSError, ConnectionError, RuntimeError):
+            except (OSError, ConnectionError, RuntimeError, TimeoutError):
                 pass
         try:
             proc.wait(timeout=ns.shutdown_timeout)

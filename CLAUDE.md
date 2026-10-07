@@ -31,7 +31,8 @@ first-boot wizard (`plasma-setup` user); runs #7/#8 verified autologin of the
 dev user `mados`, the apps, MadOS services and the MadOS first-run window
 (KDE's Welcome Center is off) in that session. Fedora 44 KDE
 uses Plasma Login Manager, not SDDM: configure it in `/etc/plasmalogin.conf.d/`. The installer ISO is
-still experimental. The bootstrap environment blocks Fedora's servers, so the CI
+still experimental: it builds and installs unattended in CI (run #10), but the
+installed system has not yet reported `MADOS_BOOT_OK`. The bootstrap environment blocks Fedora's servers, so the CI
 `image` job is the reference build. See `docs/roadmap.md` for status.
 image-builder only accepts some blueprint customizations for bootc disks
 (see `BOOTC_DISK_CUSTOMIZATIONS` in tests/config/validate.py).
