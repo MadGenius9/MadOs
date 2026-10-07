@@ -14,6 +14,8 @@ Boots an image in QEMU (UEFI) and checks, in order:
      audio      MADOS_APPS audio=ok: sound card + PipeWire default sink
      welcome    MADOS_APPS first_run=running kde_welcome=absent: the MadOS
                 first-run window opened at first login, KDE's Welcome Center not
+     defaults   MADOS_APPS defaults=ok: plasmashell's XDG_CONFIG_DIRS starts with
+                the MadOS defaults (look-and-feel, accent, kded settings)
      services   MADOS_APPS daemon/bootc/assistant=ok: MadOS's own services
                 answer on the real system and session buses
   4. network    a non-loopback interface with an IPv4 address (guest agent)
@@ -210,6 +212,11 @@ def run(ns: argparse.Namespace) -> int:
             else:
                 ok = welcome == {"first_run": "running", "kde_welcome": "absent"}
                 report.add("welcome", "pass" if ok else "fail", " ".join(f"{k}={v}" for k, v in welcome.items()))
+            defaults = res.get("defaults")
+            if defaults is None:
+                report.add("defaults", "skip", "image predates the defaults check")
+            else:
+                report.add("defaults", "pass" if defaults == "ok" else "fail", f"defaults={defaults}")
             svc = {k: res.get(k) for k in ("daemon", "bootc", "assistant")}
             if all(v is None for v in svc.values()):
                 report.add("services", "skip", "image predates the services check")
@@ -221,6 +228,7 @@ def run(ns: argparse.Namespace) -> int:
             report.add("apps", "fail" if ns.require_apps else "skip", why)
             report.add("audio", "skip", why)
             report.add("welcome", "skip", why)
+            report.add("defaults", "skip", why)
             report.add("services", "skip", why)
 
         # 4. network via guest agent

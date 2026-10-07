@@ -5,7 +5,8 @@
 //! its main loop, detected by the application claiming its D-Bus name on the
 //! session bus (a stronger signal than "the process was spawned"). Also
 //! checks that an audio device and a PipeWire default sink exist, and which
-//! first-login welcome window is open (MadOS's, not KDE's). The result
+//! first-login welcome window is open (MadOS's, not KDE's) and whether
+//! Plasma reads the MadOS desktop defaults. The result
 //! is written to `$XDG_RUNTIME_DIR/mados/session-check.json`, which
 //! `madosctl boot-report` (system service) relays to the serial console as a
 //! `MADOS_APPS` marker for the VM smoke test.
@@ -37,6 +38,10 @@ const WPCTL: &str = "/usr/bin/wpctl";
 /// Process names (`/proc/<pid>/comm`) of the first-login welcome windows.
 const FIRST_RUN_COMM: &str = "mados-first-run";
 const KDE_WELCOME_COMM: &str = "plasma-welcome";
+const PLASMASHELL_COMM: &str = "plasmashell";
+/// MadOS desktop defaults (look-and-feel, accent, kded); must come first in
+/// Plasma's XDG_CONFIG_DIRS (scripts/stage-system.py).
+const MADOS_XDG_DIR: &str = "/usr/share/mados/xdg";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -93,6 +98,9 @@ pub struct Report {
     /// KDE Welcome Center, which MadOS turns off: "absent" or "running".
     #[serde(default)]
     pub kde_welcome: String,
+    /// Plasma's config search path starts with the MadOS defaults: "ok" or why not.
+    #[serde(default)]
+    pub defaults: String,
 }
 
 impl Report {
@@ -110,6 +118,7 @@ impl Report {
             ("assistant", &self.assistant),
             ("first_run", &self.first_run),
             ("kde_welcome", &self.kde_welcome),
+            ("defaults", &self.defaults),
         ] {
             if !v.is_empty() {
                 parts.push(format!("{k}={v}"));
@@ -266,17 +275,48 @@ fn check_assistant() -> String {
     }
 }
 
-/// Whether a process named `comm` owned by `uid` runs, scanning `proc_root`
-/// (normally `/proc`).
+/// The `/proc/<pid>` directory of a process named `comm` owned by `uid`,
+/// scanning `proc_root` (normally `/proc`).
+pub fn find_process(proc_root: &Path, comm: &str, uid: u32) -> Option<PathBuf> {
+    std::fs::read_dir(proc_root)
+        .ok()?
+        .flatten()
+        .map(|e| e.path())
+        .find(|path| {
+            path.file_name()
+                .is_some_and(|n| n.to_string_lossy().bytes().all(|b| b.is_ascii_digit()))
+                && std::fs::metadata(path).map(|m| m.uid() == uid).unwrap_or(false)
+                && std::fs::read_to_string(path.join("comm")).is_ok_and(|c| c.trim_end() == comm)
+        })
+}
+
 pub fn process_running(proc_root: &Path, comm: &str, uid: u32) -> bool {
-    let Ok(entries) = std::fs::read_dir(proc_root) else {
-        return false;
-    };
-    entries.flatten().any(|e| {
-        e.file_name().to_string_lossy().bytes().all(|b| b.is_ascii_digit())
-            && e.metadata().map(|m| m.uid() == uid).unwrap_or(false)
-            && std::fs::read_to_string(e.path().join("comm")).is_ok_and(|c| c.trim_end() == comm)
-    })
+    find_process(proc_root, comm, uid).is_some()
+}
+
+/// Checks a process environment (`/proc/<pid>/environ`, NUL-separated) for
+/// the MadOS defaults directory at the front of XDG_CONFIG_DIRS.
+pub fn defaults_status(environ: &[u8]) -> String {
+    let dirs = environ
+        .split(|b| *b == 0)
+        .find_map(|v| v.strip_prefix(b"XDG_CONFIG_DIRS="))
+        .map(|v| String::from_utf8_lossy(v).into_owned());
+    match dirs {
+        None => "no-xdg-config-dirs".into(),
+        Some(d) if d.split(':').next() == Some(MADOS_XDG_DIR) => "ok".into(),
+        Some(d) if d.split(':').any(|x| x == MADOS_XDG_DIR) => "not-first".into(),
+        Some(_) => "missing".into(),
+    }
+}
+
+fn check_defaults(uid: u32) -> String {
+    match find_process(Path::new("/proc"), PLASMASHELL_COMM, uid) {
+        None => "no-plasmashell".into(),
+        Some(pid) => match std::fs::read(pid.join("environ")) {
+            Ok(env) => defaults_status(&env),
+            Err(_) => "unreadable".into(),
+        },
+    }
 }
 
 fn presence(running: bool) -> String {
@@ -343,10 +383,17 @@ pub fn run(args: &[&str]) -> i32 {
         assistant: check_assistant(),
         first_run: presence(process_running(Path::new("/proc"), FIRST_RUN_COMM, uid)),
         kde_welcome: presence(process_running(Path::new("/proc"), KDE_WELCOME_COMM, uid)),
+        defaults: check_defaults(uid),
     };
     println!(
-        "audio: {} daemon: {} bootc: {} assistant: {} first_run: {} kde_welcome: {}",
-        report.audio, report.daemon, report.bootc, report.assistant, report.first_run, report.kde_welcome
+        "audio: {} daemon: {} bootc: {} assistant: {} first_run: {} kde_welcome: {} defaults: {}",
+        report.audio,
+        report.daemon,
+        report.bootc,
+        report.assistant,
+        report.first_run,
+        report.kde_welcome,
+        report.defaults
     );
     for mut c in children {
         let _ = c.kill();
@@ -496,6 +543,21 @@ mod tests {
     }
 
     #[test]
+    fn checks_mados_defaults_first_in_config_dirs() {
+        let env = |v: &str| format!("HOME=/home/m\0{v}\0LANG=C\0").into_bytes();
+        assert_eq!(
+            defaults_status(&env("XDG_CONFIG_DIRS=/usr/share/mados/xdg:/etc/xdg")),
+            "ok"
+        );
+        assert_eq!(
+            defaults_status(&env("XDG_CONFIG_DIRS=/etc/xdg:/usr/share/mados/xdg")),
+            "not-first"
+        );
+        assert_eq!(defaults_status(&env("XDG_CONFIG_DIRS=/etc/xdg")), "missing");
+        assert_eq!(defaults_status(&env("X=1")), "no-xdg-config-dirs");
+    }
+
+    #[test]
     fn marker_format() {
         let r = Report {
             schema: 1,
@@ -517,10 +579,11 @@ mod tests {
             assistant: String::new(),
             first_run: "running".into(),
             kde_welcome: "absent".into(),
+            defaults: "ok".into(),
         };
         assert_eq!(
             r.marker(),
-            "terminal=ok browser=running audio=ok daemon=ok bootc=ok first_run=running kde_welcome=absent"
+            "terminal=ok browser=running audio=ok daemon=ok bootc=ok first_run=running kde_welcome=absent defaults=ok"
         );
         assert_eq!(token("bootc is not installed; x"), "bootc-is-not-installed--x");
     }
