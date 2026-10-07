@@ -95,6 +95,12 @@ def validate_containerfile() -> None:
     check(len(froms) == 2, "Containerfile must have a builder and a final stage")
     check(froms[-1].strip() == "FROM ${BASE_REF}", "final stage must be FROM ${BASE_REF}")
     check("selinux=0" not in cf and "setenforce" not in cf, "Containerfile must not disable SELinux")
+    # Anaconda sets multi-user.target after a text-mode install unless told
+    # otherwise; the installed system must boot to the desktop (CI run #12).
+    installer = (ROOT / "image/installer/Containerfile").read_text()
+    check("xconfig --startxonboot" in installer, "installer interactive-defaults.ks must set xconfig --startxonboot")
+    test_ks = (ROOT / "tests/smoke/iso_install.py").read_text()
+    check("\nxconfig --startxonboot\n" in test_ks, "iso_install.py kickstart must set xconfig --startxonboot")
     env = (ROOT / "image/config.env").read_text()
     keys = dict(
         l.split("=", 1) for l in env.splitlines() if l and not l.startswith("#") and "=" in l

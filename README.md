@@ -24,7 +24,7 @@ KDE Plasma (Fedora Kinoite) as a temporary bootstrap, and this README says so.
 | **MadOS identity at boot** | **verified (runs #4, #5)**: systemd banner "Welcome to MadOS 0.1.0-dev!", KDE's first-boot screen shows "Powered by MadOS" (os-release branding) |
 | **Boots in QEMU/KVM (UEFI)** | **verified in CI run #2**: `MADOS_BOOT_OK` 57 s after power-on (version 0.1.0-dev, Fedora kernel 7.2.8-200.fc44), `graphical.target` reached with **no failed units**, an active **Wayland KDE session** (KDE's first-boot wizard, found out in run #6), network up (DHCP 10.0.2.15), clean **reboot** to a second successful boot, clean **shutdown** (QEMU exit 0) |
 | **Development user's desktop** | **verified in CI runs #7 and #8**: Plasma Login Manager logs `mados` in (`MADOS_SESSION_OK type=wayland class=user desktop=KDE user=mados`, about 70 s after power-on); the desktop shows the MadOS wallpaper and, at first login, the MadOS first-run window, while KDE's Welcome Center ("Welcome to Fedora!", seen in run #7) stays closed (`first_run=running kde_welcome=absent`, run #8). Fedora 44 KDE uses **Plasma Login Manager**, not SDDM; the sessions in runs #2–#5 belonged to KDE's first-boot wizard (`plasma-setup` user) |
-| Installer ISO (`bootc-generic-iso`) | written, with an unattended install test (`make iso-test`); **experimental**. **Builds in CI (run #10)**, and the unattended Anaconda install from it into a VM disk **passes** (505 s). The installed system boots ("Welcome to MadOS 0.1.0-dev!" on the serial console) but did not report `MADOS_BOOT_OK` within 900 s; the cause is being diagnosed (the smoke test now prints a serial excerpt and screenshot when that happens). Run #9 had stopped earlier, building the installer environment (`autovt@.service` already exists on Fedora 44; fixed) |
+| Installer ISO (`bootc-generic-iso`) | written, with an unattended install test (`make iso-test`); **experimental**. **Builds in CI** (runs #10, #12) and the unattended Anaconda install into a VM disk **passes** (321–505 s). The installed system boots cleanly but to a **text login** (CI run #12 screenshot): Anaconda sets `multi-user.target` after a text-mode install, so the desktop and MadOS's boot report never start. Fixed by `xconfig --startxonboot` in the installer's defaults and the test kickstart; **unverified until the next ISO run** |
 | MadOS components (Rust) | 57 unit/integration tests: D-Bus policy tests on a private bus; mock NetworkManager/BlueZ/AccountsService/logind; fake and simulated bootc; real PulseAudio server |
 | MadOS Settings (GTK 4) | every category has a real page (About, Network & Wi-Fi, Bluetooth, Display, Sound, Power, Storage, Users, Applications, Updates, Assistant, Privacy); verified headless against mocks/real test servers, not yet inside the VM |
 | VM tooling + smoke test | verified: harness self-test (real kernel, TCG) and the MadOS image (KVM) in CI |
@@ -40,7 +40,7 @@ KDE Plasma (Fedora Kinoite) as a temporary bootstrap, and this README says so.
   session, that the terminal, file manager, browser and MadOS Settings
   start, that audio hardware and a PipeWire sink are present, and that
   MadOS's system service and assistant work on the real system.
-- `make build`, `make test`: fmt/clippy clean, 57 Rust tests, 168 static
+- `make build`, `make test`: fmt/clippy clean, 57 Rust tests, 170 static
   configuration checks, reproducibility check of generated files, QEMU
   harness self-test.
 - `madosctl about` / Settings → About: real version, kernel, CPU, memory,
@@ -65,10 +65,8 @@ KDE Plasma (Fedora Kinoite) as a temporary bootstrap, and this README says so.
 
 ### Implemented but unverified
 
-On the booted image: the MadOS Plasma look-and-feel and accent colour (the
-screenshot shows the wallpaper and MadOS's own windows, not a check of
-Plasma's settings), and all
-MadOS services against the *real* polkit, logind, NetworkManager, BlueZ,
+On the booted image: the state-changing actions of MadOS services (the smoke
+test only exercises read-only calls) against the *real* polkit, logind, NetworkManager, BlueZ,
 AccountsService, PipeWire and bootc. The installer ISO.
 
 ### Not implemented yet

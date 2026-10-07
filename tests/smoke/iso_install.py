@@ -45,6 +45,9 @@ reqpart --add-boot
 part / --grow --fstype=xfs --ondisk=vda
 rootpw --lock
 user --name=mados --groups=wheel --lock
+# A text-mode install otherwise sets the installed system's default target
+# to multi-user (text console; CI run #12).
+xconfig --startxonboot
 bootc --source-imgref containers-storage:{payload} --target-imgref {target}
 poweroff
 """

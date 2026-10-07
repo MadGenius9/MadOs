@@ -27,6 +27,8 @@ ARG ISO_LABEL
 ARG PRODUCT_NAME
 ARG PAYLOAD_REF
 ARG TARGET_REF
+# interactive-defaults.ks: `xconfig --startxonboot` makes the installed system
+# boot to the desktop (graphical.target) even after a text-mode install.
 RUN test -n "${ISO_LABEL}" && test -n "${PAYLOAD_REF}" && test -n "${TARGET_REF}" \
     && mkdir -p /usr/lib/image-builder/bootc \
     && printf '%s\n' \
@@ -37,7 +39,7 @@ RUN test -n "${ISO_LABEL}" && test -n "${PAYLOAD_REF}" && test -n "${TARGET_REF}
         "      linux: \"/images/pxeboot/vmlinuz inst.stage2=hd:LABEL=${ISO_LABEL} console=tty0 inst.graphical selinux=0 rhgb quiet\"" \
         "      initrd: \"/images/pxeboot/initrd.img\"" \
         > /usr/lib/image-builder/bootc/iso.yaml \
-    && printf 'bootc --source-imgref containers-storage:%s --target-imgref %s\n' \
+    && printf 'xconfig --startxonboot\nbootc --source-imgref containers-storage:%s --target-imgref %s\n' \
         "${PAYLOAD_REF}" "${TARGET_REF}" > /usr/share/anaconda/interactive-defaults.ks
 
 # The following is normally done by lorax to make Anaconda work; this is the
