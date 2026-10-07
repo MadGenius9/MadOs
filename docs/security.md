@@ -68,11 +68,15 @@ ISO install test checks. Upstream image-builder's recipe uses `selinux=0`
 instead, but Anaconda carries a `selinux=` boot option over to the installed
 system: CI run #13 installed a system with SELinux **disabled**, which the
 smoke test caught. Never use `selinux=0` on the installer command line
-(`tests/config/validate.py` enforces this). At the end of the install,
-`image/installer/relabel.ks` relabels `/etc` and `/var/home` of the installed
-system with that system's own policy, because files Anaconda writes there
-could carry labels it does not expect (CI run #14: `rpm-ostreed.service`
-failed with SELinux enforcing). Revisit (enforcing installer
+(`tests/config/validate.py` enforces this). Anaconda leaves `/etc/.pwd.lock` labelled
+`etc_t` instead of `shadow_t` when it creates the first user; with SELinux
+enforcing that made `rpm-ostreed.service` fail (CI run #15 AVC: `denied {
+write } name=".pwd.lock" scontext=init_t tcontext=etc_t`). The image restores
+the account database's labels at every boot with `systemd-tmpfiles` `z`
+rules (`system/rootfs/usr/lib/tmpfiles.d/mados-etc-labels.conf`) instead of
+weakening the policy. The boot report prints this boot's SELinux denials
+(`MADOS_AVC`); denials seen on unmodified Fedora components (e.g. `tuned`
+calling `chcon`, `toolbox` `nnp_transition`) are left to upstream. Revisit (enforcing installer
 environment) when the ISO path matures.
 
 **Never use dev images on real hardware or untrusted networks.**

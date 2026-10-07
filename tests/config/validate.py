@@ -100,13 +100,6 @@ def validate_containerfile() -> None:
     installer = (ROOT / "image/installer/Containerfile").read_text()
     check("xconfig --startxonboot" in installer, "installer interactive-defaults.ks must set xconfig --startxonboot")
     test_ks = (ROOT / "tests/smoke/iso_install.py").read_text()
-    # Anaconda-written files need the installed system's labels (CI run #14).
-    include = "%include /usr/share/anaconda/mados-relabel.ks"
-    check("COPY relabel.ks /usr/share/anaconda/mados-relabel.ks" in installer and include in installer,
-          "installer must ship relabel.ks and include it from interactive-defaults.ks")
-    check(include in test_ks, "iso_install.py kickstart must include mados-relabel.ks")
-    relabel = (ROOT / "image/installer/relabel.ks").read_text()
-    check(relabel.count("%post") == 1 and "%end" in relabel, "relabel.ks must be one %post section")
     # Anaconda copies a selinux= boot option to the installed system (CI run #13).
     for name, text in (("image/installer/Containerfile", installer), ("tests/smoke/iso_install.py", test_ks)):
         code = "\n".join(l for l in text.splitlines() if not l.lstrip().startswith("#"))
@@ -247,6 +240,9 @@ def validate_staging(tree: Path) -> None:
             check(True, "")
         except json.JSONDecodeError as e:
             check(False, f"{j.relative_to(tree)}: {e}")
+    labels = tree / "usr/lib/tmpfiles.d/mados-etc-labels.conf"
+    check(labels.exists() and "z /etc/.pwd.lock" in labels.read_text(),
+          "image must restore account-database labels at boot (Anaconda leaves /etc/.pwd.lock as etc_t)")
     kded = tree / "usr/share/mados/xdg/kded5rc"
     check(kded.exists() and "[Module-kded_plasma_welcome]\nautoload=false" in kded.read_text(),
           "KDE Welcome Center autostart must be off (MadOS first-run window replaces it)")

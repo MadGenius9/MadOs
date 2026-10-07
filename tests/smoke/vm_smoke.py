@@ -44,9 +44,11 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "scripts"))
 import vm  # noqa: E402
 
-BOOT_RE = re.compile(r"MADOS_BOOT_OK (.*)")
-SESSION_RE = re.compile(r"MADOS_SESSION_(OK|NONE) ?(.*)")
-APPS_RE = re.compile(r"MADOS_APPS(_NONE)? (.*)")
+# Markers are matched as complete lines: the serial log is read while QEMU
+# writes it, and a half-written line lost fields (CI run #15).
+BOOT_RE = re.compile(r"MADOS_BOOT_OK ([^\r\n]*)\r?\n")
+SESSION_RE = re.compile(r"MADOS_SESSION_(OK|NONE) ?([^\r\n]*)\r?\n")
+APPS_RE = re.compile(r"MADOS_APPS(_NONE)? ([^\r\n]*)\r?\n")
 APP_KEYS = ("terminal", "files", "browser", "settings")
 
 

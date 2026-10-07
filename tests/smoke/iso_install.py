@@ -50,8 +50,6 @@ user --name=mados --groups=wheel --lock
 xconfig --startxonboot
 bootc --source-imgref containers-storage:{payload} --target-imgref {target}
 poweroff
-# Shipped in the installer image (image/installer/relabel.ks).
-%include /usr/share/anaconda/mados-relabel.ks
 """
 
 
