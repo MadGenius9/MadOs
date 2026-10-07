@@ -24,20 +24,27 @@ OSTree) as base + MadOS-owned services and apps on top:
 
 ## Current milestone
 
-M1 (bootable VM image) is verified for the qcow2 path: CI run #2 built the
-image and booted it under KVM/UEFI (graphical target, no failed units,
-Wayland KDE session, network, clean reboot/shutdown). That session was KDE's
-first-boot wizard (`plasma-setup` user); runs #7/#8 verified autologin of the
-dev user `mados`, the apps, MadOS services and the MadOS first-run window
-(KDE's Welcome Center is off) in that session. Fedora 44 KDE
-uses Plasma Login Manager, not SDDM: configure it in `/etc/plasmalogin.conf.d/`. The installer ISO is
-still experimental: in CI runs #14-#15 it built, installed unattended and the installed
-system reached the MadOS desktop with SELinux enforcing; rpm-ostreed failed
-because Anaconda leaves /etc/.pwd.lock labelled etc_t (AVC in run #15);
-`usr/lib/tmpfiles.d/mados-etc-labels.conf` restores the labels at boot (not
-yet re-verified). The boot report prints SELinux denials as MADOS_AVC. Anaconda copies a
-`selinux=` boot option to the target: never boot the installer with
-`selinux=0` (it uses `enforcing=0`). The bootstrap environment blocks Fedora's servers, so the CI
+M1 (bootable VM image) is verified for the qcow2 path and the installer ISO;
+M6's VM install is proven. CI run #19 (QEMU/KVM, UEFI) built the image, the
+qcow2 and the ISO; both the qcow2 and a system installed unattended from the
+ISO (OEMDRV kickstart) pass the full smoke test: no failed units, SELinux
+enforcing, autologin of the dev user `mados` into Wayland Plasma, apps,
+audio, MadOS first-run window (KDE's Welcome Center is off), MadOS defaults,
+services, network, reboot, shutdown. Interactive installs and real hardware
+(M8) are untested.
+
+Lessons that are easy to break again:
+- Fedora 44 KDE uses Plasma Login Manager, not SDDM: configure it in
+  `/etc/plasmalogin.conf.d/`. KDE's first-boot wizard runs as user
+  `plasma-setup`; the smoke test checks the session belongs to `mados`.
+- Anaconda picks multi-user.target for text installs (`xconfig --startxonboot`),
+  copies a `selinux=` boot option to the installed system (never boot the
+  installer with `selinux=0`; it uses `enforcing=0`), and leaves
+  `/etc/.pwd.lock` mislabelled (`usr/lib/tmpfiles.d/mados-etc-labels.conf`).
+- The boot report prints SELinux denials as `MADOS_AVC`; smoke markers are
+  matched as complete lines.
+
+The bootstrap environment blocks Fedora's servers, so the CI
 `image` job is the reference build. See `docs/roadmap.md` for status.
 image-builder only accepts some blueprint customizations for bootc disks
 (see `BOOTC_DISK_CUSTOMIZATIONS` in tests/config/validate.py).

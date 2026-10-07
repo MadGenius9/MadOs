@@ -74,7 +74,12 @@ enforcing that made `rpm-ostreed.service` fail (CI run #15 AVC: `denied {
 write } name=".pwd.lock" scontext=init_t tcontext=etc_t`). The image restores
 the account database's labels at every boot with `systemd-tmpfiles` `z`
 rules (`system/rootfs/usr/lib/tmpfiles.d/mados-etc-labels.conf`) instead of
-weakening the policy. The boot report prints this boot's SELinux denials
+weakening the policy. CI run #19 verified the result: the installed system boots with
+SELinux enforcing and no failed units. Known leftover: on the installed
+system `systemd-tmpfiles` is itself denied relabelling `shadow` and
+`gshadow` (`relabelto`), so those two keep the labels Anaconda gave them; no
+failure has been observed, and the proper fix belongs at install time. The
+boot report prints this boot's SELinux denials
 (`MADOS_AVC`); denials seen on unmodified Fedora components (e.g. `tuned`
 calling `chcon`, `toolbox` `nnp_transition`) are left to upstream. Revisit (enforcing installer
 environment) when the ISO path matures.

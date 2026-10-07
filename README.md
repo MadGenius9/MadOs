@@ -24,7 +24,7 @@ KDE Plasma (Fedora Kinoite) as a temporary bootstrap, and this README says so.
 | **MadOS identity at boot** | **verified (runs #4, #5)**: systemd banner "Welcome to MadOS 0.1.0-dev!", KDE's first-boot screen shows "Powered by MadOS" (os-release branding) |
 | **Boots in QEMU/KVM (UEFI)** | **verified in CI run #2**: `MADOS_BOOT_OK` 57 s after power-on (version 0.1.0-dev, Fedora kernel 7.2.8-200.fc44), `graphical.target` reached with **no failed units**, an active **Wayland KDE session** (KDE's first-boot wizard, found out in run #6), network up (DHCP 10.0.2.15), clean **reboot** to a second successful boot, clean **shutdown** (QEMU exit 0) |
 | **Development user's desktop** | **verified in CI runs #7 and #8**: Plasma Login Manager logs `mados` in (`MADOS_SESSION_OK type=wayland class=user desktop=KDE user=mados`, about 70 s after power-on); the desktop shows the MadOS wallpaper and, at first login, the MadOS first-run window, while KDE's Welcome Center ("Welcome to Fedora!", seen in run #7) stays closed (`first_run=running kde_welcome=absent`, run #8). Fedora 44 KDE uses **Plasma Login Manager**, not SDDM; the sessions in runs #2–#5 belonged to KDE's first-boot wizard (`plasma-setup` user) |
-| Installer ISO (`bootc-generic-iso`) | **experimental**; unattended install test `make iso-test`. CI runs #14–#15: the ISO **builds**, the unattended Anaconda install **passes**, and the installed system boots to the MadOS desktop with **SELinux enforcing** and passes every smoke step **except one failed unit**, `rpm-ostreed.service`. Run #15's SELinux report named the cause: `avc: denied { write } name=".pwd.lock" scontext=init_t tcontext=etc_t` — Anaconda leaves `/etc/.pwd.lock` mislabelled, so systemd's DynamicUser setup cannot lock the account database. Fix: the image restores the account-database labels at every boot (`systemd-tmpfiles` `z` rules); **unverified until the next ISO run**. Earlier runs fixed `autovt@.service` (#9), the text-login default target (#12) and SELinux being disabled by the installer's `selinux=0` (#13) |
+| Installer ISO (`bootc-generic-iso`) | **verified in a VM (CI run #19)**: the ISO builds, an unattended Anaconda install (test kickstart on an `OEMDRV` disk) completes in 393 s, and the installed system passes the full smoke test: no failed units, **SELinux enforcing**, autologin of `mados`, apps, audio, MadOS first-run window, MadOS defaults, services, network, reboot, shutdown. Interactive installs and real hardware are not tested yet (M8). Fixed on the way: `autovt@.service` (#9), text-login default target (#12), SELinux disabled by the installer's `selinux=0` (#13), `/etc/.pwd.lock` mislabelled by Anaconda (#15). Known leftover: on installed systems `systemd-tmpfiles` may not relabel `shadow`/`gshadow` (SELinux `relabelto` denial; no failure observed) |
 | MadOS components (Rust) | 57 unit/integration tests: D-Bus policy tests on a private bus; mock NetworkManager/BlueZ/AccountsService/logind; fake and simulated bootc; real PulseAudio server |
 | MadOS Settings (GTK 4) | every category has a real page (About, Network & Wi-Fi, Bluetooth, Display, Sound, Power, Storage, Users, Applications, Updates, Assistant, Privacy); verified headless against mocks/real test servers, not yet inside the VM |
 | VM tooling + smoke test | verified: harness self-test (real kernel, TCG) and the MadOS image (KVM) in CI |
@@ -32,6 +32,10 @@ KDE Plasma (Fedora Kinoite) as a temporary bootstrap, and this README says so.
 
 ### What works (verified)
 
+- **The installer ISO installs MadOS into a VM** (CI run #19): the ISO
+  builds, an unattended Anaconda install completes, and the installed system
+  passes the same smoke test as the disk image, with SELinux enforcing
+  ([screenshot](docs/images/installed-ci-run19.jpg)).
 - **The MadOS image builds and boots** (GitHub Actions runs #2, #5–#8,
   QEMU/KVM, UEFI): graphical target with no failed units, SELinux enforcing,
   autologin of the development user into a Wayland Plasma session with the
@@ -67,7 +71,7 @@ KDE Plasma (Fedora Kinoite) as a temporary bootstrap, and this README says so.
 
 On the booted image: the state-changing actions of MadOS services (the smoke
 test only exercises read-only calls) against the *real* polkit, logind, NetworkManager, BlueZ,
-AccountsService, PipeWire and bootc. The installer ISO.
+AccountsService, PipeWire and bootc.
 
 ### Not implemented yet
 
