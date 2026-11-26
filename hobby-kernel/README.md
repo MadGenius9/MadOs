@@ -1,7 +1,7 @@
 # hobby-kernel
 
 A small 32-bit x86 kernel written from scratch in freestanding C and NASM,
-booted by GRUB via Multiboot2. It is an educational project and is **not
+booted by GRUB via Multiboot2 (or directly by QEMU via Multiboot1). It is an educational project and is **not
 part of the MadOS product**: the MadOS image is built from Fedora Kinoite
 (see the top-level `README.md`). Nothing in `image/` or `system/` uses this
 directory.
@@ -12,7 +12,7 @@ At boot it brings up, in order (each line is printed with `[ OK ]`):
 
 | Phase | Component | Files |
 |---|---|---|
-| 2 | Multiboot2 header, 16 KiB stack, entry point; kernel linked at 1 MiB | `src/boot.asm`, `linker.ld` |
+| 2 | Multiboot2 header (plus a Multiboot1 header for `qemu -kernel`), 16 KiB stack, entry point; kernel linked at 1 MiB | `src/boot.asm`, `linker.ld`, `src/multiboot1.c` |
 | 3 | `kernel_main`, Makefile, GRUB ISO | `src/kernel.c`, `Makefile`, `grub.cfg` |
 | 4 | VGA text driver (0xB8000, colours, scrolling, hardware cursor), `kprintf`, panic; output mirrored to COM1 | `src/vga.c`, `src/kprintf.c`, `src/serial.c` |
 | 5 | GDT (flat ring 0/3 segments); IDT with all 32 CPU exceptions and a register dump | `src/gdt.c`, `src/gdt.asm`, `src/idt.c`, `src/isr.asm` |
@@ -36,7 +36,17 @@ make test       # host unit tests for the PMM and heap + Multiboot2 header check
 make iso        # build/hobby-kernel.iso
 make run        # boot in QEMU; serial log appears in this terminal
 make run-curses # VGA text in the terminal (WSL2 on Windows 10, SSH, ...)
+make run-kernel # boot build/kernel.elf directly, no GRUB/ISO needed
+make smoke      # headless boot test that types into the shell (see below)
 ```
+
+`make smoke` (`tools/smoke_test.py`) boots QEMU without a window, waits for
+`BOOT_OK` on the serial port, then types commands as PS/2 key presses via
+the QEMU monitor and checks every answer: `echo` with Shift, an unknown
+command, `mem`, `memtest`, `heap`, `uptime` (compared with the wall clock),
+`crash null` (page-fault handler) and, in a second boot, `crash div` (CPU
+exception handler). It saves the VGA screen as `build/screen.png`.
+`make smoke-iso` runs the same test against the GRUB ISO.
 
 `make TOOLCHAIN=host` builds with the system `gcc -m32` instead of
 `i686-elf-gcc`, which is useful when no cross-compiler is installed.
@@ -53,8 +63,13 @@ shell prompt.
 - Compiles warning-free with `-Wall -Wextra -Werror` (cross and host
   toolchains). `make test` passes: the PMM and heap run on the host under
   AddressSanitizer/UBSan, and the ELF's Multiboot2 header is checked.
-- **Not yet booted in QEMU or on hardware.** The environment it was written
-  in had no QEMU, GRUB or xorriso. Run `make run` and report what you see.
+- **Boots in QEMU 9.2** (`qemu-system-i386 -kernel`, Multiboot1 path) and
+  `make smoke` passes all 13 steps.
+- **Not yet tested: the GRUB ISO path** (`make iso`, `make run`,
+  `make smoke-iso`), because the build environment had no GRUB or xorriso.
+  It differs from the tested path only in the loader and in reading the
+  Multiboot2 info directly instead of converting Multiboot1 info. Also
+  untested on real hardware.
 
 ## Memory layout
 
