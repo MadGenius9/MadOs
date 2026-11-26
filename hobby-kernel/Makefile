@@ -4,6 +4,8 @@
 #   make iso          build build/hobby-kernel.iso (needs grub-mkrescue, xorriso, mtools)
 #   make run          boot the ISO in QEMU (serial output in this terminal)
 #   make run-curses   same, VGA text shown in the terminal (no GUI needed)
+#   make run-kernel   boot the ELF directly with QEMU's Multiboot1 loader (no GRUB)
+#   make smoke        boot in QEMU headless and drive the shell (tools/smoke_test.py)
 #   make test         host unit tests for the allocators + Multiboot2 header check
 #   make TOOLCHAIN=host   use the system gcc -m32 instead of i686-elf-gcc
 
@@ -46,7 +48,7 @@ DEPS := $(patsubst src/%.c,$(BUILD)/%.d,$(C_SOURCES))
 
 QEMU_FLAGS := -m 128M -serial stdio -no-reboot -no-shutdown
 
-.PHONY: all iso run run-curses test check clean
+.PHONY: all iso run run-curses run-kernel smoke smoke-iso test check clean
 
 all: $(KERNEL)
 
@@ -76,6 +78,15 @@ run: $(ISO)
 
 run-curses: $(ISO)
 	$(QEMU) -cdrom $(ISO) -m 128M -display curses -no-reboot -no-shutdown
+
+run-kernel: $(KERNEL)
+	$(QEMU) -kernel $(KERNEL) $(QEMU_FLAGS)
+
+smoke: $(KERNEL)
+	$(PYTHON) tools/smoke_test.py --qemu $(QEMU) --kernel $(KERNEL) --screenshot $(BUILD)/screen.png
+
+smoke-iso: $(ISO)
+	$(PYTHON) tools/smoke_test.py --qemu $(QEMU) --iso $(ISO) --screenshot $(BUILD)/screen-iso.png
 
 check: $(KERNEL)
 	$(PYTHON) tools/check_multiboot2.py $(KERNEL)

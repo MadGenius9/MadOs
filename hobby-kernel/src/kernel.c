@@ -10,6 +10,7 @@
 #include "kernel.h"
 #include "keyboard.h"
 #include "kprintf.h"
+#include "multiboot1.h"
 #include "multiboot2.h"
 #include "paging.h"
 #include "pic.h"
@@ -68,7 +69,7 @@ static void print_banner(void)
     vga_set_color(VGA_LIGHT_CYAN, VGA_BLACK);
     kputs(KERNEL_NAME " " KERNEL_VERSION);
     vga_set_color(VGA_LIGHT_GREY, VGA_BLACK);
-    kputs(" - 32-bit x86, booted via Multiboot2\n\n");
+    kputs(" - 32-bit x86\n\n");
 }
 
 __attribute__((noreturn)) void kernel_main(uint32_t magic, uint32_t mbi_phys)
@@ -78,13 +79,21 @@ __attribute__((noreturn)) void kernel_main(uint32_t magic, uint32_t mbi_phys)
     bool have_serial = serial_init();
     print_banner();
 
-    if (magic != MB2_BOOTLOADER_MAGIC)
-        panic("not loaded by a Multiboot2 bootloader (eax=0x%08x)", (unsigned)magic);
-    const struct mb2_info *mbi = (const struct mb2_info *)(uintptr_t)mbi_phys;
+    const struct mb2_info *mbi;
+    const char *protocol;
+    if (magic == MB2_BOOTLOADER_MAGIC) {
+        mbi = (const struct mb2_info *)(uintptr_t)mbi_phys;
+        protocol = "Multiboot2";
+    } else if (magic == MB1_BOOTLOADER_MAGIC) {
+        mbi = mb1_convert(mbi_phys);
+        protocol = "Multiboot1";
+    } else {
+        panic("not loaded by a Multiboot bootloader (eax=0x%08x)", (unsigned)magic);
+    }
 
     const struct mb2_tag_string *loader = (const struct mb2_tag_string *)mb2_find_tag(mbi, MB2_TAG_BOOTLOADER_NAME);
-    ok("Multiboot2 handoff");
-    kprintf(" (bootloader: %s)\n", loader ? loader->string : "unknown");
+    ok(protocol);
+    kprintf(" handoff (bootloader: %s)\n", loader ? loader->string : "unknown");
     ok("VGA text console");
     kputs(have_serial ? " + COM1 serial\n" : "\n");
 

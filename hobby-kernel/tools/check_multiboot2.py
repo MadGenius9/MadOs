@@ -7,6 +7,8 @@ Verifies what GRUB's `multiboot2` command needs: a 32-bit x86 ELF, a valid
 Multiboot2 header (magic, architecture, length, checksum, tags ending in an
 end tag) that is 8-byte aligned within the first 32 KiB of the file, and an
 entry point inside an executable loadable segment at or above 1 MiB.
+Also checks the optional Multiboot1 header (used by `qemu-system-i386
+-kernel`): 4-byte aligned in the first 8 KiB, with a valid checksum.
 """
 from __future__ import annotations
 
@@ -14,7 +16,9 @@ import struct
 import sys
 
 MB2_MAGIC = 0xE85250D6
+MB1_MAGIC = 0x1BADB002
 SEARCH_LIMIT = 32768
+MB1_SEARCH_LIMIT = 8192
 PT_LOAD = 1
 PF_X = 1
 EM_386 = 3
@@ -55,6 +59,17 @@ def check(path: str) -> None:
             entry_ok = True
     if not entry_ok:
         fail(f"entry point 0x{e_entry:08x} is not in an executable PT_LOAD segment")
+
+    for off in range(0, min(len(data), MB1_SEARCH_LIMIT) - 12 + 1, 4):
+        magic, flags, checksum = struct.unpack_from("<III", data, off)
+        if magic != MB1_MAGIC:
+            continue
+        if (magic + flags + checksum) & 0xFFFFFFFF:
+            fail(f"Multiboot1 header at offset 0x{off:x} has a bad checksum")
+        if flags & 0x10000:
+            fail("Multiboot1 header asks for a.out address fields; this kernel relies on ELF loading")
+        print(f"OK: Multiboot1 header at file offset 0x{off:x} (flags 0x{flags:x})")
+        break
 
     for off in range(0, min(len(data), SEARCH_LIMIT) - 16 + 1, 8):
         magic, arch, length, checksum = struct.unpack_from("<IIII", data, off)
