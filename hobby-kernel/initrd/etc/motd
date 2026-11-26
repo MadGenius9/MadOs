@@ -1,0 +1,3 @@
+Welcome to hobby-kernel!
+This file was read from the initial ramdisk (a tar archive loaded by the
+bootloader). Try: ls /bin, run cat /etc/motd, run echo hello world.
