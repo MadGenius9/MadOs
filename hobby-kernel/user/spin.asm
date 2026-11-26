@@ -1,7 +1,10 @@
 ; spin - burns CPU forever without system calls. The timer still preempts
 ; it, so the shell stays responsive; stop it with `kill PID` or Ctrl+C.
 bits 32
-org 0x40000000
+section .text
+global _start
 
-start:
-    jmp start
+_start:
+    jmp _start
+
+section .note.GNU-stack noalloc noexec nowrite progbits

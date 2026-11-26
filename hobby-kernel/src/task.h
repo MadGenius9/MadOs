@@ -5,7 +5,17 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "fs.h"
 #include "idt.h"
+
+#define TASK_MAX_FILES 8
+#define TASK_MAX_ARGS 16
+#define TASK_MAX_ARG_BYTES 1024
+
+struct open_file {
+    const struct fs_node *node; /* NULL = free slot */
+    uint32_t offset;
+};
 
 /* Preemptive round-robin multitasking on one CPU.
 
@@ -37,6 +47,7 @@ struct task {
     int exit_code;
     void (*entry)(void *);
     void *arg;
+    struct open_file files[TASK_MAX_FILES]; /* user processes' file descriptors */
     struct task *next;
 };
 
@@ -46,9 +57,11 @@ void tasking_init(const char *name);
 
 struct task *task_create_kernel(const char *name, void (*entry)(void *), void *arg);
 
-/* Creates a ring-3 process running a flat binary loaded at USER_BASE, with
-   a 16 KiB stack ending at USER_TOP. Returns NULL when out of memory. */
-struct task *task_create_user(const char *name, const uint8_t *image, size_t size);
+/* Creates a ring-3 process from an ELF executable, with a 16 KiB stack
+   ending at USER_TOP that holds argv. Returns NULL and sets *error (a static
+   message) when the image is invalid or memory runs out. */
+struct task *task_create_user(const char *name, const uint8_t *image, size_t size, int argc,
+                              const char *const *argv, const char **error);
 
 struct task *task_current(void);
 struct task *task_find(uint32_t pid);

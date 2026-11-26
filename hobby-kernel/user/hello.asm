@@ -1,9 +1,10 @@
 ; hello - greets from ring 3, prints its pid and exits with code 0.
 bits 32
-org 0x40000000
+section .text
+global _start
 %include "syscalls.inc"
 
-start:
+_start:
     PRINT greeting
 
     mov eax, SYS_GETPID
@@ -31,3 +32,5 @@ STRING greeting, "Hello from user mode (ring 3)! My pid is "
 STRING newline, 10
 digits: times 10 db 0
 digits_end:
+
+section .note.GNU-stack noalloc noexec nowrite progbits

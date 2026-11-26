@@ -127,6 +127,15 @@ bool paging_map_page(uintptr_t virt, uint32_t phys, uint32_t flags)
     return ok;
 }
 
+bool paging_map_kernel_range(uintptr_t virt, uint32_t phys, size_t len, uint32_t flags)
+{
+    for (size_t off = 0; off < len; off += PAGE_SIZE) {
+        if (!paging_map_page(virt + off, phys + off, flags & ~PG_USER))
+            return false;
+    }
+    return true;
+}
+
 uint32_t paging_unmap_page(uintptr_t virt)
 {
     uint32_t pdi = PDE_INDEX(virt);

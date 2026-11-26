@@ -28,15 +28,35 @@ struct mb1_mmap_entry {
     uint32_t type;
 } __attribute__((packed));
 
+struct mb1_module {
+    uint32_t mod_start;
+    uint32_t mod_end;
+    uint32_t string;
+    uint32_t reserved;
+} __attribute__((packed));
+
 #define MB1_FLAG_MEMINFO (1u << 0)
+#define MB1_FLAG_MODS (1u << 3)
 #define MB1_FLAG_MMAP (1u << 6)
 #define MB1_FLAG_LOADER_NAME (1u << 9)
 
 #define MAX_NAME 64
 #define MAX_ENTRIES 64
+#define MAX_MODULES 4
 
-static uint8_t buffer[8 + 8 + MAX_NAME + sizeof(struct mb2_tag_mmap) + MAX_ENTRIES * sizeof(struct mb2_mmap_entry) + 8]
-    __attribute__((aligned(8)));
+static uint8_t buffer[8 + 8 + MAX_NAME + sizeof(struct mb2_tag_mmap) + MAX_ENTRIES * sizeof(struct mb2_mmap_entry) +
+                      MAX_MODULES * (sizeof(struct mb2_tag_module) + MAX_NAME) + 8] __attribute__((aligned(8)));
+
+/* Appends a string tag body: copies at most MAX_NAME - 1 bytes plus NUL. */
+static uint32_t copy_string(char *dst, const char *src)
+{
+    size_t len = strlen(src);
+    if (len > MAX_NAME - 1)
+        len = MAX_NAME - 1;
+    memcpy(dst, src, len);
+    dst[len] = '\0';
+    return (uint32_t)len + 1;
+}
 
 static uint32_t align8(uint32_t n)
 {
@@ -90,6 +110,19 @@ const struct mb2_info *mb1_convert(uint32_t mbi_phys)
         mmap->entry_version = 0;
         mmap->size = (uint32_t)(sizeof(*mmap) + n * sizeof(struct mb2_mmap_entry));
         p += align8(mmap->size);
+    }
+
+    if (mb1->flags & MB1_FLAG_MODS) {
+        const struct mb1_module *mods = (const struct mb1_module *)(uintptr_t)mb1->mods_addr;
+        for (uint32_t i = 0; i < mb1->mods_count && i < MAX_MODULES; i++) {
+            struct mb2_tag_module *m = (struct mb2_tag_module *)p;
+            m->type = MB2_TAG_MODULE;
+            m->mod_start = mods[i].mod_start;
+            m->mod_end = mods[i].mod_end;
+            const char *cmdline = mods[i].string ? (const char *)(uintptr_t)mods[i].string : "";
+            m->size = (uint32_t)sizeof(*m) + copy_string(m->string, cmdline);
+            p += align8(m->size);
+        }
     }
 
     struct mb2_tag *end_tag = (struct mb2_tag *)p;

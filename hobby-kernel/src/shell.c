@@ -12,7 +12,7 @@
 #include "kstring.h"
 #include "pit.h"
 #include "pmm.h"
-#include "programs.h"
+#include "fs.h"
 #include "task.h"
 #include "vga.h"
 
@@ -55,8 +55,11 @@ static void cmd_help(void)
           "  memtest        allocate, verify and free heap memory\n"
           "  uptime         time since boot\n"
           "  ps             list tasks\n"
-          "  run NAME [&]   run a user program (& = in the background)\n"
-          "  run            list the user programs\n"
+          "  ls [PATH]      list a directory of the ramdisk\n"
+          "  cat FILE       print a file\n"
+          "  run NAME [ARGS...] [&]\n"
+          "                 run /bin/NAME in user mode (& = in the background)\n"
+          "  run            list the programs in /bin\n"
           "  kill PID       stop a task\n"
           "  spawn ticker   start a kernel thread that ticks 3 times\n"
           "  crash null     read address 0 (page fault)\n"
@@ -193,12 +196,66 @@ static void wait_for(uint32_t pid)
     }
 }
 
+static void cmd_ls(const char *path)
+{
+    if (*path == '\0')
+        path = "/";
+    const struct fs_node *node = fs_lookup(path);
+    if (!node) {
+        kprintf("ls: %s: not found\n", path);
+        return;
+    }
+    if (!node->is_dir) {
+        kprintf("%8u  %s\n", (unsigned)node->size, node->path);
+        return;
+    }
+    const struct fs_node *child;
+    for (size_t i = 0; (child = fs_child(node, i)) != NULL; i++) {
+        if (child->is_dir)
+            kprintf("%8s  %s/\n", "<dir>", fs_basename(child));
+        else
+            kprintf("%8u  %s\n", (unsigned)child->size, fs_basename(child));
+    }
+}
+
+static void cmd_cat(const char *path)
+{
+    const struct fs_node *node = fs_lookup(path);
+    if (!node) {
+        kprintf("cat: %s: not found\n", path);
+        return;
+    }
+    if (node->is_dir) {
+        kprintf("cat: %s: is a directory\n", path);
+        return;
+    }
+    for (uint32_t i = 0; i < node->size; i++)
+        kputc((char)node->data[i]);
+}
+
+/* Splits `line` in place at spaces. Returns the number of words. */
+static int split_words(char *line, char **words, int max)
+{
+    int n = 0;
+    while (*line) {
+        while (*line == ' ')
+            *line++ = '\0';
+        if (!*line)
+            break;
+        if (n == max)
+            return -1;
+        words[n++] = line;
+        while (*line && *line != ' ')
+            line++;
+    }
+    return n;
+}
+
 static void cmd_run(char *args)
 {
     if (*args == '\0') {
-        kputs("User programs:\n");
-        for (size_t i = 0; i < user_program_count; i++)
-            kprintf("  %-8s %s\n", user_programs[i].name, user_programs[i].description);
+        kputs("Programs in /bin (run NAME [ARGS...] [&]):\n");
+        cmd_ls("/bin");
         return;
     }
     bool background = false;
@@ -208,22 +265,45 @@ static void cmd_run(char *args)
     if (len && args[len - 1] == '&') {
         background = true;
         args[--len] = '\0';
-        while (len && args[len - 1] == ' ')
-            args[--len] = '\0';
     }
-    const struct user_program *prog = program_find(args);
-    if (!prog) {
-        kprintf("run: no program named '%s' (type 'run' for the list)\n", args);
+    char *argv[TASK_MAX_ARGS];
+    int argc = split_words(args, argv, TASK_MAX_ARGS);
+    if (argc <= 0) {
+        kputs(argc < 0 ? "run: too many arguments\n" : "usage: run NAME [ARGS...] [&]\n");
         return;
     }
-    struct task *t = task_create_user(prog->name, prog->start, (size_t)(prog->end - prog->start));
+
+    char path[FS_PATH_MAX];
+    const char *name = argv[0];
+    if (name[0] == '/') {
+        if (strlen(name) >= sizeof(path)) {
+            kputs("run: path too long\n");
+            return;
+        }
+        memcpy(path, name, strlen(name) + 1);
+    } else {
+        if (strlen(name) + 6 >= sizeof(path)) {
+            kputs("run: name too long\n");
+            return;
+        }
+        memcpy(path, "/bin/", 5);
+        memcpy(path + 5, name, strlen(name) + 1);
+    }
+    const struct fs_node *node = fs_lookup(path);
+    if (!node || node->is_dir) {
+        kprintf("run: %s: no such program (type 'run' for the list)\n", path);
+        return;
+    }
+    const char *error = NULL;
+    struct task *t = task_create_user(fs_basename(node), node->data, node->size, argc, (const char *const *)argv,
+                                      &error);
     if (!t) {
-        kputs("run: out of memory\n");
+        kprintf("run: %s: %s\n", path, error);
         return;
     }
     uint32_t pid = t->pid;
     if (background)
-        kprintf("[started process %u (%s) in the background]\n", (unsigned)pid, prog->name);
+        kprintf("[started process %u (%s) in the background]\n", (unsigned)pid, t->name);
     else
         wait_for(pid);
 }
@@ -326,6 +406,10 @@ static void execute(char *line)
         cmd_uptime();
     else if (strcmp(line, "ps") == 0)
         cmd_ps();
+    else if (strcmp(line, "ls") == 0)
+        cmd_ls(args);
+    else if (strcmp(line, "cat") == 0)
+        cmd_cat(args);
     else if (strcmp(line, "run") == 0)
         cmd_run(args);
     else if (strcmp(line, "kill") == 0)

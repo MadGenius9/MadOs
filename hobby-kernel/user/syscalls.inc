@@ -7,10 +7,13 @@ SYS_WRITE   equ 1
 SYS_GETPID  equ 2
 SYS_SLEEP   equ 3
 SYS_YIELD   equ 4
+SYS_OPEN    equ 5
+SYS_READ    equ 6
+SYS_CLOSE   equ 7
+SYS_READDIR equ 8
 
 EFAULT      equ 14
 
-USER_BASE   equ 0x40000000
 
 ; write(buf, len)
 %macro WRITE 2

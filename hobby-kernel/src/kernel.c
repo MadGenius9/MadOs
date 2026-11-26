@@ -4,6 +4,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+#include "fs.h"
 #include "gdt.h"
 #include "heap.h"
 #include "idt.h"
@@ -117,6 +118,12 @@ __attribute__((noreturn)) void kernel_main(uint32_t magic, uint32_t mbi_phys)
     /* Phase 7: memory management. Read everything needed from the
        Multiboot2 info first: after paging only the first 8 MiB stay mapped. */
     pmm_init(mbi);
+    uint32_t initrd_start = 0, initrd_end = 0;
+    const struct mb2_tag_module *module = (const struct mb2_tag_module *)mb2_find_tag(mbi, MB2_TAG_MODULE);
+    if (module) {
+        initrd_start = module->mod_start;
+        initrd_end = module->mod_end;
+    }
     ok("");
     kprintf("Physical memory manager: %u MiB usable, %u frames free\n", (unsigned)(pmm_usable_frames() / 256),
             (unsigned)pmm_free_frames());
@@ -125,6 +132,27 @@ __attribute__((noreturn)) void kernel_main(uint32_t magic, uint32_t mbi_phys)
     heap_init();
     heap_self_test();
     ok("Kernel heap at 0xD0000000 (self-test passed)\n");
+
+    /* Phase 10: the initial ramdisk, mapped read-only into kernel space. This
+       must happen before the first process: its page directory copies the
+       kernel's page tables. */
+    if (initrd_end > initrd_start) {
+        uint32_t offset = initrd_start & (PAGE_SIZE - 1);
+        size_t size = initrd_end - initrd_start;
+        if (size + offset > INITRD_LIMIT - INITRD_BASE ||
+            !paging_map_kernel_range(INITRD_BASE, initrd_start - offset, size + offset, PG_PRESENT))
+            panic("cannot map the initial ramdisk (%u bytes)", (unsigned)size);
+        size_t nodes = fs_init_tar((const uint8_t *)(uintptr_t)(INITRD_BASE + offset), size);
+        if (nodes) {
+            ok("");
+            kprintf("Initial ramdisk: %u KiB, %u files and directories\n", (unsigned)(size / 1024),
+                    (unsigned)nodes - 1);
+        } else {
+            kputs("[FAIL] Initial ramdisk is not a valid tar archive\n");
+        }
+    } else {
+        kputs("[ -- ] No initial ramdisk: no programs to run\n");
+    }
 
     /* Phase 8-9: tasks and user mode. This code becomes task 0, the shell. */
     tasking_init("shell");

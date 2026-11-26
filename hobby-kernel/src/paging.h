@@ -14,12 +14,15 @@
      0x00001000-0x007FFFFF identity map: low memory, VGA, kernel     (kernel)
      0x40000000-0xBFFFFFFF user programs: code at USER_BASE, stack below USER_TOP
      0xD0000000-0xDFFFFFFF kernel heap                                (kernel)
+     0xE0000000-0xEFFFFFFF initial ramdisk, read-only                   (kernel)
      0xFFBFF000           scratch mapping for editing other page tables (kernel)
      0xFFC00000-0xFFFFFFFF recursive mapping of the current page tables */
 #define USER_BASE 0x40000000u
 #define USER_TOP 0xC0000000u
 #define KERNEL_HEAP_BASE 0xD0000000u
 #define KERNEL_HEAP_LIMIT 0xE0000000u
+#define INITRD_BASE 0xE0000000u
+#define INITRD_LIMIT 0xF0000000u
 
 /* Identity-maps the first 8 MiB except page 0 and enables paging with a
    recursive page directory. Page tables for the kernel heap are created up
@@ -29,6 +32,11 @@ void paging_init(void);
 /* Maps one 4 KiB page in the current address space; allocates a page table
    from the PMM if needed. Returns false if already mapped or out of memory. */
 bool paging_map_page(uintptr_t virt, uint32_t phys, uint32_t flags);
+
+/* Maps [phys, phys + len) at virt in kernel space, page by page. Only for
+   boot time, before the first process exists: page tables created here are
+   then copied into every address space. */
+bool paging_map_kernel_range(uintptr_t virt, uint32_t phys, size_t len, uint32_t flags);
 
 /* Unmaps one page and returns the physical frame it pointed to (0 if it
    was not mapped). Does not free the frame. */

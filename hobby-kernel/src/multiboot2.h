@@ -10,6 +10,7 @@
 #define MB2_TAG_END 0
 #define MB2_TAG_CMDLINE 1
 #define MB2_TAG_BOOTLOADER_NAME 2
+#define MB2_TAG_MODULE 3
 #define MB2_TAG_BASIC_MEMINFO 4
 #define MB2_TAG_MMAP 6
 
@@ -30,6 +31,14 @@ struct mb2_tag_string {
     uint32_t type;
     uint32_t size;
     char string[];
+};
+
+struct mb2_tag_module {
+    uint32_t type;
+    uint32_t size;
+    uint32_t mod_start; /* physical address */
+    uint32_t mod_end;   /* one past the last byte */
+    char string[];      /* the module's command line */
 };
 
 struct mb2_tag_basic_meminfo {
@@ -54,10 +63,14 @@ struct mb2_tag_mmap {
     /* followed by entries of entry_size bytes */
 };
 
-/* Returns the first tag of the given type, or NULL. */
-static inline const struct mb2_tag *mb2_find_tag(const struct mb2_info *info, uint32_t type)
+/* Returns the first tag of the given type after `after` (NULL = from the
+   start), or NULL. */
+static inline const struct mb2_tag *mb2_find_next(const struct mb2_info *info, const struct mb2_tag *after,
+                                                  uint32_t type)
 {
     const uint8_t *p = (const uint8_t *)info + 8;
+    if (after)
+        p = (const uint8_t *)after + ((after->size + 7) & ~7u);
     const uint8_t *end = (const uint8_t *)info + info->total_size;
     while (p + sizeof(struct mb2_tag) <= end) {
         const struct mb2_tag *tag = (const struct mb2_tag *)p;
@@ -68,6 +81,11 @@ static inline const struct mb2_tag *mb2_find_tag(const struct mb2_info *info, ui
         p += (tag->size + 7) & ~7u;
     }
     return NULL;
+}
+
+static inline const struct mb2_tag *mb2_find_tag(const struct mb2_info *info, uint32_t type)
+{
+    return mb2_find_next(info, NULL, type);
 }
 
 #endif

@@ -91,6 +91,11 @@ void pmm_init(const struct mb2_info *info)
     pmm_reserve_range(0, LOW_MEMORY_END);
     pmm_reserve_range((uintptr_t)_kernel_start, (uintptr_t)_kernel_end - (uintptr_t)_kernel_start);
     pmm_reserve_range((uintptr_t)info, info->total_size);
+    for (const struct mb2_tag *t = mb2_find_tag(info, MB2_TAG_MODULE); t; t = mb2_find_next(info, t, MB2_TAG_MODULE)) {
+        const struct mb2_tag_module *m = (const struct mb2_tag_module *)t;
+        if (m->mod_end > m->mod_start)
+            pmm_reserve_range(m->mod_start, m->mod_end - m->mod_start);
+    }
 }
 
 static uint32_t alloc_locked(void)

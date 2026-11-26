@@ -1,10 +1,11 @@
 ; counter - prints "counter N: k" five times, sleeping 300 ms in between,
 ; where N is its pid. Run two in the background to watch them interleave.
 bits 32
-org 0x40000000
+section .text
+global _start
 %include "syscalls.inc"
 
-start:
+_start:
     mov eax, SYS_GETPID
     int 0x80
     add al, '0'                 ; single-digit pids are enough for a demo
@@ -27,3 +28,5 @@ start:
     EXIT 0
 
 STRING line, "counter ?: ?", 10
+
+section .note.GNU-stack noalloc noexec nowrite progbits

@@ -100,7 +100,12 @@ class Session:
         self.mon: Monitor | None = None
 
     def __enter__(self) -> "Session":
-        boot = ["-kernel", self.args.kernel] if self.args.kernel else ["-cdrom", self.args.iso]
+        if self.args.kernel:
+            boot = ["-kernel", self.args.kernel]
+            if self.args.initrd:
+                boot += ["-initrd", self.args.initrd]
+        else:
+            boot = ["-cdrom", self.args.iso]
         cmd = [self.args.qemu, *boot, "-m", "128M", "-display", "none", "-no-reboot",
                "-serial", f"file:{self.log_path}", "-monitor", f"unix:{self.mon_path},server,nowait"]
         print(f"== {self.label}\n+", " ".join(cmd))
@@ -181,6 +186,32 @@ def heap_used(text: str) -> int | None:
     return int(m.group(1)) if m else None
 
 
+def filesystem_steps(vm: Session) -> None:
+    """Phase 10: initial ramdisk, ELF loading from /bin, file system calls, argv."""
+    vm.step("initial ramdisk found at boot", None, r"Initial ramdisk: \d+ KiB, \d+ files and directories",
+            from_start=True)
+    vm.step("built-in ls", "ls /\n", r"<dir>  bin/\r?\n\s+<dir>  etc/")
+    vm.step("built-in cat", "cat /etc/motd\n", r"Welcome to hobby-kernel!")
+    vm.step("C program reads a file with open/read (cat)", "run cat /etc/motd\n",
+            r"Welcome to hobby-kernel![\s\S]*run echo hello world\.\r?\n\[process \d+ \(cat\) exited with code 0\]")
+    vm.step("C program lists a directory with readdir (ls)", "run ls /bin\n",
+            r"badptr\r?\ncat\r?\ncounter\r?\necho\r?\nhello\r?\nls\r?\npriv\r?\nspin\r?\n"
+            r"\[process \d+ \(ls\) exited with code 0\]")
+    vm.step("argc/argv reach main (echo)", "run echo hello from argv\n",
+            r"(?m)^hello from argv\r?\n\[process \d+ \(echo\) exited with code 3\]")
+    vm.step("open() of a missing file fails cleanly", "run cat /nope\n",
+            r"cat: /nope: no such file or directory\r?\n\[process \d+ \(cat\) exited with code 1\]")
+    vm.step("open() of a directory fails", "run cat /bin\n", r"cat: /bin: is a directory")
+    vm.step("readdir() of a file fails", "run ls /etc/motd\n", r"ls: /etc/motd: not a directory")
+    vm.step("unknown program", "run nosuch\n", r"run: /bin/nosuch: no such program")
+    vm.step("ELF loader rejects a non-executable", "run /etc/motd\n", r"run: /etc/motd: not an ELF file")
+    first = frames_free(vm.command("mem\n"))
+    vm.command("run cat /etc/motd\n")
+    second = frames_free(vm.command("mem\n"))
+    vm.check("C program memory is freed after exit (no frame leak)", first is not None and first == second,
+             f"frames free {first} -> {second}")
+
+
 def process_steps(vm: Session) -> None:
     """Phase 8-9: scheduler, kernel threads, user processes, system calls."""
     heap_before = heap_used(vm.command("heap\n"))
@@ -201,7 +232,9 @@ def process_steps(vm: Session) -> None:
     vm.check("process memory is freed after exit (no frame leak)", first is not None and first == second,
              f"frames free {first} -> {second}")
 
-    vm.step("write() refuses a kernel pointer", "run badptr\n", r"refused \(EFAULT\)")
+    vm.step("write() and open() refuse kernel pointers", "run badptr\n",
+            r"write\(\) with a kernel pointer was refused \(EFAULT\)[\s\S]*"
+            r"open\(\) with a kernel pointer was refused \(EFAULT\)")
     vm.step("ring-3 write to kernel memory kills only the process", None,
             r"\(badptr\) killed: Page fault at 0x00100000 \(protection violation, write\)", from_start=True)
     vm.step("privileged instruction in ring 3 kills only the process", "run priv\n",
@@ -245,6 +278,7 @@ def main() -> int:
     src = ap.add_mutually_exclusive_group(required=True)
     src.add_argument("--kernel", help="boot the ELF with QEMU's Multiboot1 loader")
     src.add_argument("--iso", help="boot a GRUB ISO (Multiboot2)")
+    ap.add_argument("--initrd", help="initial ramdisk for --kernel (the ISO carries its own)")
     ap.add_argument("--screenshot", type=Path, help="save the VGA screen as PNG here")
     ap.add_argument("--timeout", type=float, default=30)
     args = ap.parse_args()
@@ -287,6 +321,10 @@ def main() -> int:
     with Session(args, "process session", failures) as vm:
         if vm.boot():
             process_steps(vm)
+
+    with Session(args, "filesystem session", failures) as vm:
+        if vm.boot():
+            filesystem_steps(vm)
 
     print("smoke test:", "FAILED " + ", ".join(failures) if failures else "all steps passed")
     return 1 if failures else 0

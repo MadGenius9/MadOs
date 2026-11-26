@@ -1,5 +1,6 @@
 #include "task.h"
 
+#include "elf.h"
 #include "gdt.h"
 #include "heap.h"
 #include "kprintf.h"
@@ -138,41 +139,77 @@ static bool map_zeroed(uintptr_t start, size_t bytes)
     return true;
 }
 
-struct task *task_create_user(const char *name, const uint8_t *image, size_t size)
+/* Copies argv onto the top of the (active) user stack:
+       [strings ...][pad][argv[0] .. argv[argc-1], NULL]  <- returned address
+   The process starts with ECX = argc and EDX = argv (see user/lib/crt0.asm). */
+static uint32_t push_args(int argc, const char *const *argv)
 {
-    if (size == 0 || size > USER_TOP - USER_BASE - USER_STACK_SIZE)
+    uint32_t sp = USER_TOP;
+    uint32_t pointers[TASK_MAX_ARGS + 1];
+    for (int i = argc - 1; i >= 0; i--) {
+        size_t len = strlen(argv[i]) + 1;
+        sp -= (uint32_t)len;
+        memcpy((void *)(uintptr_t)sp, argv[i], len);
+        pointers[i] = sp;
+    }
+    pointers[argc] = 0;
+    sp &= ~15u;
+    sp -= (uint32_t)(argc + 1) * 4;
+    sp &= ~15u;
+    memcpy((void *)(uintptr_t)sp, pointers, (size_t)(argc + 1) * 4);
+    return sp;
+}
+
+struct task *task_create_user(const char *name, const uint8_t *image, size_t size, int argc,
+                              const char *const *argv, const char **error)
+{
+    const char *err = NULL;
+    size_t arg_bytes = 0;
+    for (int i = 0; i < argc; i++)
+        arg_bytes += strlen(argv[i]) + 1;
+    if (argc < 0 || argc > TASK_MAX_ARGS || arg_bytes > TASK_MAX_ARG_BYTES) {
+        *error = "too many or too long arguments";
         return NULL;
+    }
     struct task *t = alloc_task(name);
-    if (!t)
+    if (!t) {
+        *error = "out of memory";
         return NULL;
+    }
     t->user = true;
     t->page_dir = paging_create_address_space();
     if (!t->page_dir) {
         kfree(t->kstack);
         kfree(t);
+        *error = "out of memory";
         return NULL;
     }
 
     /* Fill the new address space while it is active; the kernel half (and
-       so `image`) stays visible. Interrupts stay off so no other task runs
-       with this page directory loaded. */
+       so `image` and `argv`) stays visible. Interrupts stay off so no other
+       task runs with this page directory loaded. */
     uint32_t irq = irq_save();
     uint32_t previous = paging_current_directory();
     paging_switch_directory(t->page_dir);
-    size_t image_bytes = (size + PAGE_SIZE - 1) & ~(size_t)(PAGE_SIZE - 1);
-    bool ok = map_zeroed(USER_BASE, image_bytes) && map_zeroed(USER_TOP - USER_STACK_SIZE, USER_STACK_SIZE);
-    if (ok)
-        memcpy((void *)USER_BASE, image, size);
+    uint32_t entry = 0;
+    uint32_t stack_bottom = USER_TOP - USER_STACK_SIZE;
+    err = elf_load(image, size, stack_bottom, &entry);
+    if (!err && !map_zeroed(stack_bottom, USER_STACK_SIZE))
+        err = "out of memory";
+    uint32_t user_sp = err ? 0 : push_args(argc, argv);
     paging_switch_directory(previous);
     irq_restore(irq);
 
-    if (!ok) {
+    if (err) {
         paging_destroy_address_space(t->page_dir);
         kfree(t->kstack);
         kfree(t);
+        *error = err;
         return NULL;
     }
-    t->regs = initial_frame(t, true, USER_BASE, USER_TOP);
+    t->regs = initial_frame(t, true, entry, user_sp);
+    t->regs->ecx = (uint32_t)argc;
+    t->regs->edx = user_sp;
     add_task(t);
     return t;
 }
