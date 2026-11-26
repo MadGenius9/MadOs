@@ -18,6 +18,8 @@
 #include "pmm.h"
 #include "serial.h"
 #include "shell.h"
+#include "syscall.h"
+#include "task.h"
 #include "vga.h"
 
 #define TIMER_HZ 100
@@ -99,7 +101,7 @@ __attribute__((noreturn)) void kernel_main(uint32_t magic, uint32_t mbi_phys)
 
     /* Phase 5: CPU tables */
     gdt_init();
-    ok("GDT loaded (flat ring 0 and ring 3 segments)\n");
+    ok("GDT and TSS loaded (flat ring 0 and ring 3 segments)\n");
     idt_init();
     ok("IDT loaded (32 exception and 16 IRQ handlers)\n");
 
@@ -123,6 +125,12 @@ __attribute__((noreturn)) void kernel_main(uint32_t magic, uint32_t mbi_phys)
     heap_init();
     heap_self_test();
     ok("Kernel heap at 0xD0000000 (self-test passed)\n");
+
+    /* Phase 8-9: tasks and user mode. This code becomes task 0, the shell. */
+    tasking_init("shell");
+    ok("Scheduler: preemptive round-robin, 50 ms time slices\n");
+    syscall_init();
+    ok("System calls on int 0x80; user programs run in ring 3\n");
 
     __asm__ volatile("sti");
     ok("Interrupts enabled\n");

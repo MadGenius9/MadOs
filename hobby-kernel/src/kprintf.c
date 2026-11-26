@@ -5,6 +5,7 @@
 
 #include "kstring.h"
 #include "serial.h"
+#include "sync.h"
 #include "vga.h"
 
 void kputc(char c)
@@ -15,8 +16,10 @@ void kputc(char c)
 
 void kputs(const char *s)
 {
+    uint32_t irq = irq_save();
     while (*s)
         kputc(*s++);
+    irq_restore(irq);
 }
 
 static int format_uint(char *out, uint32_t value, unsigned base, bool upper)
@@ -130,10 +133,12 @@ void kvprintf(const char *fmt, va_list ap)
 
 void kprintf(const char *fmt, ...)
 {
+    uint32_t irq = irq_save();
     va_list ap;
     va_start(ap, fmt);
     kvprintf(fmt, ap);
     va_end(ap);
+    irq_restore(irq);
 }
 
 void panic(const char *fmt, ...)

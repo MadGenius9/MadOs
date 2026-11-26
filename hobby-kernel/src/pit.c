@@ -3,6 +3,7 @@
 #include "idt.h"
 #include "io.h"
 #include "pic.h"
+#include "task.h"
 
 #define PIT_CHANNEL0 0x40
 #define PIT_COMMAND 0x43
@@ -17,6 +18,7 @@ static void on_tick(struct regs *r)
 {
     (void)r;
     ticks++;
+    task_tick();
 }
 
 void pit_init(uint32_t hz)

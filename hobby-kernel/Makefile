@@ -37,7 +37,7 @@ CFLAGS := -std=gnu11 -ffreestanding -O2 -g -Wall -Wextra -Werror \
           -march=i686 -mgeneral-regs-only \
           -fno-pie -fno-stack-protector -fcf-protection=none \
           -fno-asynchronous-unwind-tables -fno-tree-loop-distribute-patterns
-ASFLAGS := -f elf32 -g -F dwarf
+ASFLAGS := -f elf32 -g -F dwarf -I$(BUILD)/user/
 LDFLAGS := -T linker.ld -ffreestanding -nostdlib -no-pie -Wl,--build-id=none -Wl,-z,noexecstack
 
 C_SOURCES := $(wildcard src/*.c)
@@ -45,6 +45,7 @@ ASM_SOURCES := $(wildcard src/*.asm)
 OBJECTS := $(patsubst src/%.asm,$(BUILD)/%.asm.o,$(ASM_SOURCES)) \
            $(patsubst src/%.c,$(BUILD)/%.o,$(C_SOURCES))
 DEPS := $(patsubst src/%.c,$(BUILD)/%.d,$(C_SOURCES))
+USER_PROGRAMS := $(patsubst user/%.asm,$(BUILD)/user/%.bin,$(wildcard user/*.asm))
 
 QEMU_FLAGS := -m 128M -serial stdio -no-reboot -no-shutdown
 
@@ -60,6 +61,13 @@ $(BUILD)/%.o: src/%.c | $(BUILD)
 
 $(BUILD)/%.asm.o: src/%.asm | $(BUILD)
 	$(AS) $(ASFLAGS) $< -o $@
+
+# User programs: flat ring-3 binaries embedded by src/programs.asm.
+$(BUILD)/user/%.bin: user/%.asm user/syscalls.inc
+	@mkdir -p $(BUILD)/user
+	$(AS) -f bin -Iuser/ $< -o $@
+
+$(BUILD)/programs.asm.o: $(USER_PROGRAMS)
 
 $(KERNEL): $(OBJECTS) linker.ld
 	$(CC) $(LDFLAGS) -o $@ $(OBJECTS) $(LIBGCC)
@@ -91,7 +99,7 @@ smoke-iso: $(ISO)
 check: $(KERNEL)
 	$(PYTHON) tools/check_multiboot2.py $(KERNEL)
 
-TEST_CFLAGS := -std=gnu11 -O1 -g -Wall -Wextra -Werror -iquote src -fPIE -pie -fsanitize=address,undefined
+TEST_CFLAGS := -std=gnu11 -DUNIT_TEST -O1 -g -Wall -Wextra -Werror -iquote src -fPIE -pie -fsanitize=address,undefined
 
 $(BUILD)/heap_test: tests/heap_test.c src/heap.c src/heap.h | $(BUILD)
 	$(HOSTCC) $(TEST_CFLAGS) $< -o $@

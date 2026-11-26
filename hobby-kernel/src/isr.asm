@@ -3,6 +3,9 @@
 ;
 ; Every stub leaves the same frame on the stack (see struct regs in idt.h)
 ; and jumps to a common routine that calls interrupt_dispatch(struct regs *).
+; The dispatcher returns the frame to resume, which is how the scheduler
+; switches tasks: it returns another task's saved frame and the stub
+; continues on that task's kernel stack.
 
 extern interrupt_dispatch
 
@@ -81,6 +84,9 @@ IRQ 13, 45      ; FPU
 IRQ 14, 46      ; primary ATA
 IRQ 15, 47      ; secondary ATA / spurious
 
+ISR_NOERR 128   ; int 0x80: system call (callable from ring 3)
+ISR_NOERR 129   ; int 0x81: yield to the scheduler (kernel only)
+
 interrupt_common:
     pusha                   ; edi, esi, ebp, esp, ebx, edx, ecx, eax
     push ds
@@ -97,7 +103,7 @@ interrupt_common:
 
     push esp                ; argument: struct regs *
     call interrupt_dispatch
-    add esp, 4
+    mov esp, eax            ; frame to resume (possibly another task's)
 
     pop gs
     pop fs
@@ -107,7 +113,8 @@ interrupt_common:
     add esp, 8              ; drop the vector number and error code
     iret
 
-; Table of stub addresses for idt.c: 32 exceptions, then 16 IRQs.
+; Table of stub addresses for idt.c: 32 exceptions, 16 IRQs, then the
+; system call and yield vectors.
 section .rodata
 global isr_stub_table
 isr_stub_table:
@@ -121,6 +128,8 @@ isr_stub_table:
     dd irq %+ i
 %assign i i+1
 %endrep
+    dd isr128
+    dd isr129
 
 ; Mark the stack non-executable for the linker.
 section .note.GNU-stack noalloc noexec nowrite progbits

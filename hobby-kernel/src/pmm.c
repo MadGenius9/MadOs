@@ -6,6 +6,7 @@
 #include "kernel.h"
 #include "kprintf.h"
 #include "kstring.h"
+#include "sync.h"
 
 #define MAX_FRAMES (1u << 20) /* 4 GiB / 4 KiB */
 #define BITMAP_WORDS (MAX_FRAMES / 32)
@@ -92,7 +93,7 @@ void pmm_init(const struct mb2_info *info)
     pmm_reserve_range((uintptr_t)info, info->total_size);
 }
 
-uint32_t pmm_alloc_frame(void)
+static uint32_t alloc_locked(void)
 {
     uint32_t words = (frame_limit + 31) / 32;
     for (uint32_t n = 0; n < words; n++) {
@@ -110,15 +111,26 @@ uint32_t pmm_alloc_frame(void)
     return 0;
 }
 
+uint32_t pmm_alloc_frame(void)
+{
+    uint32_t irq = irq_save();
+    uint32_t frame = alloc_locked();
+    irq_restore(irq);
+    return frame;
+}
+
 void pmm_free_frame(uint32_t phys)
 {
     uint32_t frame = phys / PAGE_SIZE;
+    uint32_t irq = irq_save();
     if (phys % PAGE_SIZE || frame >= frame_limit || !frame_used(frame)) {
+        irq_restore(irq);
         kprintf("pmm: ignoring bad free of frame 0x%08x\n", (unsigned)phys);
         return;
     }
     set_free(frame);
     free_frames++;
+    irq_restore(irq);
 }
 
 uint32_t pmm_usable_frames(void)

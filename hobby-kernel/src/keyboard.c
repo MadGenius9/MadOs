@@ -6,6 +6,8 @@
 #include "idt.h"
 #include "io.h"
 #include "pic.h"
+#include "sync.h"
+#include "task.h"
 
 #define PS2_DATA 0x60
 #define PS2_STATUS 0x64
@@ -42,6 +44,7 @@ static bool shift_left, shift_right, ctrl, alt, caps_lock, extended;
    at 256 on their own. */
 static volatile char buffer[256];
 static volatile uint8_t head, tail;
+static struct task *waiter; /* task blocked in keyboard_getchar */
 
 static void enqueue(char c)
 {
@@ -50,6 +53,10 @@ static void enqueue(char c)
         return; /* full: drop the key */
     buffer[head] = c;
     head = next;
+    if (waiter) {
+        task_wake(waiter);
+        waiter = NULL;
+    }
 }
 
 static char translate(uint8_t code)
@@ -135,18 +142,28 @@ void keyboard_init(void)
     pic_unmask(1);
 }
 
+bool keyboard_trygetchar(char *c)
+{
+    uint32_t irq = irq_save();
+    bool got = head != tail;
+    if (got) {
+        *c = buffer[tail];
+        tail = (uint8_t)(tail + 1);
+    }
+    irq_restore(irq);
+    return got;
+}
+
 char keyboard_getchar(void)
 {
-    for (;;) {
-        __asm__ volatile("cli");
-        if (head != tail) {
-            char c = buffer[tail];
-            tail = (uint8_t)(tail + 1);
-            __asm__ volatile("sti");
-            return c;
-        }
-        /* sti takes effect after the next instruction, so no interrupt can
-           slip in between the check above and hlt. */
-        __asm__ volatile("sti; hlt");
+    char c;
+    uint32_t irq = irq_save();
+    /* Interrupts stay off between the empty check and blocking, so the key
+       press that wakes us cannot slip in between. */
+    while (!keyboard_trygetchar(&c)) {
+        waiter = task_current();
+        task_block();
     }
+    irq_restore(irq);
+    return c;
 }

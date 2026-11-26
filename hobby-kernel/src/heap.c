@@ -6,13 +6,14 @@
 #include "kstring.h"
 #include "paging.h"
 #include "pmm.h"
+#include "sync.h"
 
 /* Overridable so tests/heap_test.c can run this file on the host. */
 #ifndef HEAP_START
-#define HEAP_START ((uintptr_t)0xD0000000u)
+#define HEAP_START ((uintptr_t)KERNEL_HEAP_BASE)
 #endif
 #ifndef HEAP_MAX
-#define HEAP_MAX ((uintptr_t)0xE0000000u)
+#define HEAP_MAX ((uintptr_t)KERNEL_HEAP_LIMIT)
 #endif
 
 #define HEAP_ALIGN 16
@@ -131,7 +132,7 @@ void heap_init(void)
     heap_end = HEAP_START;
 }
 
-void *kmalloc(size_t size)
+static void *kmalloc_locked(size_t size)
 {
     if (size == 0 || size > HEAP_MAX - HEAP_START)
         return NULL;
@@ -148,6 +149,14 @@ void *kmalloc(size_t size)
     return b + 1;
 }
 
+void *kmalloc(size_t size)
+{
+    uint32_t irq = irq_save();
+    void *p = kmalloc_locked(size);
+    irq_restore(irq);
+    return p;
+}
+
 void *kcalloc(size_t count, size_t size)
 {
     if (size && count > (size_t)-1 / size)
@@ -158,10 +167,8 @@ void *kcalloc(size_t count, size_t size)
     return p;
 }
 
-void kfree(void *ptr)
+static void kfree_locked(void *ptr)
 {
-    if (!ptr)
-        return;
     struct block *b = (struct block *)ptr - 1;
     if ((uintptr_t)b < HEAP_START || (uintptr_t)ptr >= heap_end || (uintptr_t)ptr % HEAP_ALIGN)
         panic("kfree: %p is not a heap pointer", ptr);
@@ -177,8 +184,18 @@ void kfree(void *ptr)
         merge_with_next(b->prev);
 }
 
+void kfree(void *ptr)
+{
+    if (!ptr)
+        return;
+    uint32_t irq = irq_save();
+    kfree_locked(ptr);
+    irq_restore(irq);
+}
+
 void heap_get_stats(struct heap_stats *stats)
 {
+    uint32_t irq = irq_save();
     memset(stats, 0, sizeof(*stats));
     stats->mapped_bytes = heap_end - HEAP_START;
     for (struct block *b = head; b; b = b->next) {
@@ -190,4 +207,5 @@ void heap_get_stats(struct heap_stats *stats)
             stats->free_bytes += b->size;
         }
     }
+    irq_restore(irq);
 }

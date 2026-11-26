@@ -23,7 +23,7 @@ import time
 import zlib
 from pathlib import Path
 
-KEY_NAMES = {" ": "spc", "\n": "ret", "-": "minus", ".": "dot", "/": "slash"}
+KEY_NAMES = {" ": "spc", "\n": "ret", "-": "minus", ".": "dot", "/": "slash", "&": "shift-7"}
 
 
 def key_for(ch: str) -> str:
@@ -148,11 +148,95 @@ class Session:
         self.failures.append(name)
         return False
 
+    def command(self, keys: str) -> str:
+        """Types a command and returns its output, up to the next prompt."""
+        start = len(self.serial())
+        assert self.mon is not None
+        self.mon.type(keys)
+        if not self.wait_for(r"hobby-kernel> ", start + len(keys)):
+            return ""
+        return self.serial()[start:]
+
+    def check(self, name: str, ok: bool, detail: str = "") -> None:
+        if ok and "\n" in detail:
+            detail = ""  # multi-line output is only worth showing on failure
+        print(f"{'PASS' if ok else 'FAIL'} {name}{': ' + detail if detail else ''}")
+        if not ok:
+            self.failures.append(name)
+
     def boot(self) -> bool:
         if not self.step("boot reaches BOOT_OK", None, r"(?m)^BOOT_OK\r?$"):
             return False
         self.mon = Monitor(self.mon_path)
         return self.step("shell prompt", None, r"hobby-kernel> ", from_start=True)
+
+
+def frames_free(text: str) -> int | None:
+    m = re.search(r"\((\d+)/\d+ frames free\)", text)
+    return int(m.group(1)) if m else None
+
+
+def heap_used(text: str) -> int | None:
+    m = re.search(r"(\d+) bytes used", text)
+    return int(m.group(1)) if m else None
+
+
+def process_steps(vm: Session) -> None:
+    """Phase 8-9: scheduler, kernel threads, user processes, system calls."""
+    heap_before = heap_used(vm.command("heap\n"))
+
+    out = vm.command("ps\n")
+    vm.check("ps lists shell and idle", bool(re.search(r"0\s+running\s+kernel\s+\d+\s+shell", out))
+             and bool(re.search(r"\s1\s+\w+\s+kernel\s+\d+\s+idle", out)), out.strip())
+
+    vm.step("kernel thread runs while the shell stays responsive", "spawn ticker\necho shell still works\n",
+            r"started kernel thread \d+ \(ticker\)[\s\S]*shell still works[\s\S]*ticker: done")
+
+    vm.step("user program runs in ring 3 and exits", "run hello\n",
+            r"Hello from user mode \(ring 3\)! My pid is \d+\r?\n\[process \d+ \(hello\) exited with code 0\]")
+
+    first = frames_free(vm.command("mem\n"))
+    vm.command("run hello\n")
+    second = frames_free(vm.command("mem\n"))
+    vm.check("process memory is freed after exit (no frame leak)", first is not None and first == second,
+             f"frames free {first} -> {second}")
+
+    vm.step("write() refuses a kernel pointer", "run badptr\n", r"refused \(EFAULT\)")
+    vm.step("ring-3 write to kernel memory kills only the process", None,
+            r"\(badptr\) killed: Page fault at 0x00100000 \(protection violation, write\)", from_start=True)
+    vm.step("privileged instruction in ring 3 kills only the process", "run priv\n",
+            r"\(priv\) killed: General protection fault")
+
+    vm.step("two background processes run concurrently", "run counter &\nrun counter &\n",
+            r"counter (\d): 1[\s\S]*counter (?!\1)\d: 1[\s\S]*counter \d: 5[\s\S]*exited with code 0"
+            r"[\s\S]*exited with code 0")
+
+    out = vm.command("run spin &\n")
+    m = re.search(r"started process (\d+) \(spin\)", out)
+    vm.check("background spin starts", m is not None, out.strip())
+    if m:
+        pid = m.group(1)
+        time.sleep(1.0)
+        out = vm.command("ps\n")
+        sm = re.search(rf"\s{pid}\s+(running|ready)\s+user\s+(\d+)\s+spin", out)
+        vm.check("ring-3 busy loop is preempted (shell answers, spin got CPU time)",
+                 sm is not None and int(sm.group(2)) > 0, out.strip())
+        vm.step("kill PID", f"kill {pid}\n", rf"\[process {pid} \(spin\) killed\]")
+        out = vm.command("ps\n")
+        vm.check("killed process is gone from ps", "spin" not in out, out.strip())
+
+    start = len(vm.serial())
+    assert vm.mon is not None
+    vm.mon.type("run spin\n")
+    time.sleep(0.7)
+    vm.mon.command("sendkey ctrl-c")
+    vm.check("Ctrl+C stops a foreground program",
+             vm.wait_for(r"\^C\r?\n\[process \d+ \(spin\) killed\][\s\S]*hobby-kernel> ", start))
+
+    time.sleep(0.3)
+    after = heap_used(vm.command("heap\n"))
+    vm.check("finished tasks are reaped (heap back to its starting use)",
+             heap_before is not None and heap_before == after, f"{heap_before} -> {after} bytes used")
 
 
 def main() -> int:
@@ -172,7 +256,7 @@ def main() -> int:
             vm.step("unknown command", "frobnicate\n", r"frobnicate: command not found")
             vm.step("mem (PMM)", "mem\n", r"Physical memory: \d+ KiB usable")
             vm.step("memtest (heap + paging)", "memtest\n", r"memtest: OK")
-            vm.step("heap stats", "heap\n", r"Heap: \d+ KiB mapped, 0 bytes used")
+            vm.step("heap stats", "heap\n", r"Heap: \d+ KiB mapped, \d+ bytes used")
             time.sleep(0.5)
             start = len(vm.serial())
             vm.step("uptime (PIT IRQ)", "uptime\n", r"Up [1-9]\d*\.\d\d s|Up 0\.(?!00)\d\d s")
@@ -199,6 +283,10 @@ def main() -> int:
         if vm.boot():
             vm.step("crash div (CPU exception handler)", "crash div\n",
                     r"CPU exception 0: Divide error[\s\S]*eip=[0-9a-f]{8}[\s\S]*KERNEL PANIC: unhandled CPU exception")
+
+    with Session(args, "process session", failures) as vm:
+        if vm.boot():
+            process_steps(vm)
 
     print("smoke test:", "FAILED " + ", ".join(failures) if failures else "all steps passed")
     return 1 if failures else 0

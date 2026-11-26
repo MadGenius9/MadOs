@@ -3,6 +3,7 @@
 #include "gdt.h"
 #include "kprintf.h"
 #include "pic.h"
+#include "task.h"
 #include "vga.h"
 
 struct idt_entry {
@@ -18,14 +19,16 @@ struct idt_ptr {
     uint32_t base;
 } __attribute__((packed));
 
-/* Present, ring 0, 32-bit interrupt gate (the CPU clears IF on entry). */
+/* Present, 32-bit interrupt gate (the CPU clears IF on entry); ring 0 only,
+   or also callable with `int` from ring 3. */
 #define IDT_INTERRUPT_GATE 0x8E
+#define IDT_INTERRUPT_GATE_USER 0xEE
 
 static struct idt_entry idt[256];
 static struct idt_ptr idt_pointer;
 static interrupt_handler_t handlers[256];
 
-extern const uint32_t isr_stub_table[48]; /* isr.asm */
+extern const uint32_t isr_stub_table[50]; /* isr.asm */
 
 static const char *const exception_names[32] = {
     "Divide error",
@@ -75,6 +78,8 @@ void idt_init(void)
 {
     for (uint8_t v = 0; v < 48; v++)
         set_gate(v, isr_stub_table[v], GDT_KERNEL_CODE, IDT_INTERRUPT_GATE);
+    set_gate(SYSCALL_VECTOR, isr_stub_table[48], GDT_KERNEL_CODE, IDT_INTERRUPT_GATE_USER);
+    set_gate(YIELD_VECTOR, isr_stub_table[49], GDT_KERNEL_CODE, IDT_INTERRUPT_GATE);
 
     idt_pointer.limit = sizeof(idt) - 1;
     idt_pointer.base = (uint32_t)(uintptr_t)&idt;
@@ -88,6 +93,15 @@ void interrupt_register_handler(uint8_t vector, interrupt_handler_t handler)
 
 static void unhandled_exception(struct regs *r)
 {
+    if (r->int_no < 32 && regs_from_user(r)) {
+        /* A user program misbehaved: kill it, not the kernel. */
+        task_kill_current("%s at eip=0x%08x", exception_names[r->int_no], (unsigned)r->eip);
+    }
+    if (r->int_no >= 32) {
+        vga_set_color(VGA_LIGHT_RED, VGA_BLACK);
+        panic("unexpected interrupt vector %u", (unsigned)r->int_no);
+    }
+
     vga_set_color(VGA_LIGHT_RED, VGA_BLACK);
     /* uint32_t is unsigned long with i686-elf-gcc, so cast for %u/%x. */
     kprintf("\nCPU exception %u: %s (error code 0x%x)\n", (unsigned)r->int_no, exception_names[r->int_no],
@@ -101,21 +115,21 @@ static void unhandled_exception(struct regs *r)
     panic("unhandled CPU exception");
 }
 
-void interrupt_dispatch(struct regs *r)
+struct regs *interrupt_dispatch(struct regs *r)
 {
     if (r->int_no >= IRQ_BASE && r->int_no < IRQ_BASE + 16) {
         uint8_t irq = (uint8_t)(r->int_no - IRQ_BASE);
         if (pic_is_spurious(irq))
-            return;
+            return r;
         if (handlers[r->int_no])
             handlers[r->int_no](r);
         pic_send_eoi(irq);
-        return;
-    }
-
-    if (r->int_no < 256 && handlers[r->int_no]) {
+    } else if (r->int_no < 256 && handlers[r->int_no]) {
         handlers[r->int_no](r);
-        return;
+    } else {
+        unhandled_exception(r);
     }
-    unhandled_exception(r);
+    /* The timer (end of time slice), the yield vector and wake-ups ask for a
+       task switch; it happens here, on the way out of the interrupt. */
+    return task_need_resched() ? task_switch(r) : r;
 }
